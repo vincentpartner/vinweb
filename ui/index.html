@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VinWeb</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ======================= Seitenleiste ======================= -->
+  <aside class="navspalte">
+    <div class="ident">
+      <span class="dot"></span>
+      <div><b>VinWeb</b><small>Websystem</small></div>
+    </div>
+
+    <select id="projektwahl" title="Projekt wechseln"></select>
+
+    <nav class="menu reiter">
+      <button data-reiter="start" data-kat="start" class="aktiv">Start</button>
+
+      <div class="m-gruppe">Material</div>
+      <button data-reiter="import" data-kat="material">Import &amp; Ernte</button>
+
+      <div class="m-gruppe">Pr&uuml;fen</div>
+      <button data-reiter="befunde" data-kat="pruefen">Befunde <span class="zahl" id="befundzahl">0</span></button>
+      <button data-reiter="struktur" data-kat="pruefen" title="Was geh&ouml;rt ins Repo, was auf den Server?">Dateien</button>
+
+      <div class="m-gruppe">Bearbeiten</div>
+      <button data-reiter="vorschau" data-kat="bearbeiten">Vorschau</button>
+      <button data-reiter="seo" data-kat="bearbeiten">SEO</button>
+      <button data-reiter="bausteine" data-kat="bearbeiten"
+        title="Design-Bausteine f&uuml;r VinWebMidi ernten und freigeben">Bausteine <span class="zahl" id="bausteinzahl" hidden>0</span></button>
+
+      <div class="m-gruppe">Ver&ouml;ffentlichen</div>
+      <button data-reiter="build" data-kat="veroeffentlichen">Build</button>
+      <button data-reiter="endpruefung" data-kat="veroeffentlichen">Endpr&uuml;fung <span class="zahl" id="pruefzahl" hidden>0</span></button>
+
+      <div class="m-gruppe">Absichern</div>
+      <button data-reiter="verlauf" data-kat="sichern">Verlauf <span class="zahl" id="verlaufzahl">0</span></button>
+    </nav>
+
+    <div class="nav-fuss">
+      <div class="nav-fuss-knoepfe">
+        <button class="btn klein" id="btnAnalyse" title="Analyse neu berechnen">Neu pr&uuml;fen</button>
+        <button class="btn klein" id="btnZip" title="Aktuellen Quellstand als ZIP herunterladen (f&uuml;r SiteSett)">ZIP</button>
+      </div>
+      <div class="status" id="status">Bereit.</div>
+    </div>
+  </aside>
+
+  <!-- ======================= Arbeitsbereich ======================= -->
+  <main class="inhalt">
+
+    <!-- Start: der Weg zum Go-Live -->
+    <section class="panel aktiv" data-panel="start">
+      <div class="panel-scroll" id="startInhalt">
+        <div class="tab-info">Importiere zuerst ein Projekt, dann erscheint hier der Weg zum Go-Live.</div>
+      </div>
+    </section>
+
+    <!-- Import & Ernte -->
+    <section class="panel" data-panel="import">
+      <div class="panel-scroll">
+        <div class="karte">
+          <h4>Projekt importieren</h4>
+          <div class="karten-inhalt">
+            <div class="dropzone" id="dropzone">
+              <b>ZIP hierher ziehen</b>
+              oder klicken zum Ausw&auml;hlen
+            </div>
+            <div class="pfadzeile">
+              <input type="text" id="pfad" placeholder="oder Pfad einf&uuml;gen: ~/Downloads/....zip">
+              <button class="btn klein" id="btnPfad">Laden</button>
+            </div>
+            <input type="file" id="datei" accept=".zip" hidden>
+            <p class="karten-hinweis">Nimmt Exporte aus Claude Design (und jedes andere Website-ZIP).
+              Nach dem Import l&auml;uft automatisch die Pr&uuml;fung &ndash; die Ergebnisse stehen unter <b>Befunde</b>.</p>
+          </div>
+        </div>
+
+        <div class="karte">
+          <h4>Inhalte einer bestehenden Website ernten</h4>
+          <div class="karten-inhalt">
+            <div class="pfadzeile">
+              <input type="text" id="ernteUrl" placeholder="www.kunde.ch">
+              <button class="btn klein" id="btnErnte">Ernten</button>
+            </div>
+            <div id="ernteStand" class="karten-hinweis" style="margin-top:8px"></div>
+            <p class="karten-hinweis">Sammelt Texte und Bilder als Rohstoff f&uuml;r den Neubau &ndash;
+              mit Galerie zum Aussortieren. Beachtet robots.txt und l&auml;dt gedrosselt.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Vorschau -->
+    <section class="panel" data-panel="vorschau">
+      <div class="vorschau-zeile">
+        <div class="seitenspalte">
+          <div class="s-kopf">Seiten <span id="seitenzahl"></span></div>
+          <div class="liste" id="seitenliste"></div>
+        </div>
+        <div class="vorschau-haupt">
+          <div class="tab-info">So sieht die Website aus. <b>Quelle</b> = Arbeitsstand:
+            <b>Doppelklick auf einen Text</b> = direkt &auml;ndern (Esc bricht ab),
+            Bilder anklicken = ersetzen. <b>Build</b> = der fertige Live-Stand.</div>
+          <div class="vorschau-leiste">
+            <button class="btn klein" data-geraet="desktop" title="Nur Desktop-Ansicht (1440 px)">Desktop</button>
+            <button class="btn klein" data-geraet="tablet" title="Nur Tablet-Ansicht (834 px)">Tablet</button>
+            <button class="btn klein" data-geraet="mobile" title="Nur Handy-Ansicht (390 px)">Mobile</button>
+            <button class="btn klein primary" data-geraet="beide" title="Desktop und Handy nebeneinander">Beide</button>
+            <span class="trenner"></span>
+            <button class="btn klein" id="btnQuelle" title="Arbeitsstand ansehen: mit Bild-Editor, ohne SEO-Anreicherung">Quelle</button>
+            <button class="btn klein" id="btnBuild" title="Fertigen Live-Stand ansehen: optimiert, mit SEO, ohne Editor" hidden>Build</button>
+            <span class="trenner"></span>
+            <button class="btn klein" id="btnNeuladen" title="Vorschau neu laden, z. B. nach einer &Uuml;bernahme">Neu laden</button>
+            <a class="btn klein" id="btnExtern" href="#" target="_blank" rel="noopener" title="Diese Seite gross im eigenen Browser-Tab &ouml;ffnen"
+               style="text-decoration:none;display:inline-block">Im Browser &ouml;ffnen</a>
+            <span class="titel" id="vorschauTitel">Noch kein Projekt geladen</span>
+          </div>
+          <div class="buehne" id="buehne">
+            <div class="leer" id="vorschauLeer">
+              Importiere zuerst ein ZIP (Men&uuml;punkt &laquo;Import &amp; Ernte&raquo;), dann erscheint hier die Vorschau.
+            </div>
+            <div class="geraete" id="geraete" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Befunde -->
+    <section class="panel" data-panel="befunde">
+      <div class="panel-scroll">
+        <div class="tab-info">Was zwischen diesem Stand und einer sauberen Live-Website
+          noch steht &ndash; automatisch gepr&uuml;ft bei Import und auf &laquo;Neu pr&uuml;fen&raquo;.
+          Rot = muss weg, Gelb = sollte, Blau = gut zu wissen.</div>
+        <div class="befunde" id="befundliste"></div>
+      </div>
+    </section>
+
+    <!-- Struktur -->
+    <section class="panel" data-panel="struktur">
+      <div class="panel-scroll">
+        <div class="tab-info">
+          <b>Zwei Schalter pro Eintrag.</b> <b>Repo</b> bedeutet: wird versioniert und gesichert.
+          <b>Server</b> bedeutet: wird sp&auml;ter ver&ouml;ffentlicht. Deine Notizen sollen gesichert,
+          aber nicht &ouml;ffentlich sein &ndash; Zugangsdaten umgekehrt auf den Server, aber nie ins Repo.
+          VinWeb schl&auml;gt vor, entscheiden tust du.
+        </div>
+        <div class="karte"><table class="tab" id="strukturtab"></table></div>
+      </div>
+    </section>
+
+    <!-- Verlauf -->
+    <section class="panel" data-panel="verlauf">
+      <div class="panel-scroll">
+        <div class="tab-info">Dein Sicherheitsnetz: Jede &Uuml;bernahme wird automatisch
+          als Stand festgehalten (plus alle 5 Minuten bei &Auml;nderungen). Jeder Stand
+          l&auml;sst sich ansehen und komplett oder je Datei zur&uuml;ckholen.</div>
+
+        <!-- Fernlager: das private GitHub-Repo dieser Website - verbindet
+             VinWeb mit VinWebMini/Midi beim Kunden (gemeinsamer Verlauf). -->
+        <div class="karte" id="fernlagerKarte">
+          <h4>Fernlager (GitHub) <span class="z" id="fernStand"></span></h4>
+          <div class="karten-inhalt">
+            <div id="fernVerbinden" hidden>
+              <p class="karten-hinweis" style="margin:0 0 10px">
+                Ein privates GitHub-Repo pro Website verbindet VinWeb mit
+                VinWebMini/Midi beim Kunden: <b>ein gemeinsamer Verlauf</b>, und du
+                kannst jederzeit selbst fixen und hochladen. Das GitHub-Token tr&auml;gst
+                du einmal unter <b>&#9881; (KI-Spalte)</b> ein; das Repo legst du auf
+                github.com an (privat, leer).</p>
+              <div class="pfadzeile">
+                <input type="text" id="fernUrl" placeholder="https://github.com/vincent-partner/kunde-website">
+                <button class="btn klein primary" id="btnFernVerbinden"
+                  title="Merkt sich die Adresse und l&auml;dt den kompletten Verlauf hoch">Verbinden &amp; hochladen</button>
+              </div>
+              <p class="karten-hinweis" id="fernVerbindenStatus" style="margin-top:8px"></p>
+            </div>
+            <div id="fernVerbunden" hidden>
+              <div class="werkzeugzeile">
+                <span class="fern-url" id="fernUrlAnzeige"></span>
+                <span style="flex:1"></span>
+                <button class="btn klein" id="btnFernAbgleichen"
+                  title="Fragt das Fernlager: Hat der Kunde neue St&auml;nde? Ver&auml;ndert nichts.">Abgleichen</button>
+                <button class="btn klein primary" id="btnFernUebernehmen" hidden
+                  title="Holt die Kundenst&auml;nde in deinen Verlauf">&Uuml;bernehmen</button>
+                <button class="btn klein" id="btnFernHochladen" hidden
+                  title="L&auml;dt deine lokalen St&auml;nde ins Fernlager">Hochladen</button>
+                <button class="btn klein" id="btnFernTrennen"
+                  title="Nur die Verbindung l&ouml;sen - das Repo auf GitHub bleibt unber&uuml;hrt">Trennen</button>
+              </div>
+              <p class="karten-hinweis" id="fernInfo" style="margin-top:8px"></p>
+              <div id="fernKonflikt" hidden>
+                <p class="karten-hinweis" style="margin:10px 0 6px"><b>Bearbeitungs-Konflikt:</b>
+                  Ihr habt beide dieselben Stellen ge&auml;ndert. Betroffen:</p>
+                <ul id="fernKonfliktDateien" class="fern-dateien"></ul>
+                <div class="werkzeugzeile" style="margin-top:8px">
+                  <button class="btn klein" id="btnFernMeine"
+                    title="Bei den betroffenen Stellen gewinnt deine Fassung; alles &Uuml;brige des Kunden kommt normal herein. Nichts geht verloren - beides bleibt im Verlauf.">Meine Fassung behalten</button>
+                  <button class="btn klein" id="btnFernKunde"
+                    title="Bei den betroffenen Stellen gewinnt die Kundenfassung; deine bleibt im Verlauf abrufbar.">Kundenfassung &uuml;bernehmen</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="werkzeugzeile">
+          <button class="btn klein primary" id="btnSichern" title="H&auml;lt den aktuellen Zustand sofort als benannten Stand fest">Stand jetzt sichern</button>
+          <input type="text" id="standName" placeholder="Name, z.&#8239;B. &bdquo;vor Umbau Referenzen&ldquo;" style="width:260px">
+          <span style="flex:1"></span>
+          <label class="werkzeug-label">Tag:
+            <input type="date" id="standDatum" style="font-size:12px">
+          </label>
+          <button class="btn klein" id="btnDatumWeg" title="Tagesfilter aufheben, alle St&auml;nde zeigen">Alle</button>
+          <span id="autoTakt" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div class="warnstreifen" id="ungesichertStreifen" hidden>
+          <span>Es gibt &Auml;nderungen, die noch in keinem Stand festgehalten sind.</span>
+          <button class="btn klein" id="btnJetztSichern">Jetzt sichern</button>
+        </div>
+        <div class="verlauf-liste" id="verlaufListe"></div>
+      </div>
+    </section>
+
+    <!-- Build -->
+    <section class="panel" data-panel="build">
+      <div class="panel-scroll">
+        <div class="werkzeugzeile">
+          <button class="btn klein primary" id="btnBuildErzeugen" title="Erzeugt den Live-Stand neu. Quelle bleibt unber&uuml;hrt, dauert ca. 20 Sekunden.">Produktions-Build erstellen</button>
+          <span class="titel" id="buildStatus" style="flex:1">Noch kein Build erstellt.</span>
+          <button class="btn klein" id="btnBuildAnsehen" hidden title="Wechselt in die Vorschau und zeigt den fertigen Build">Build in Vorschau &ouml;ffnen</button>
+        </div>
+        <div class="befunde" id="buildBericht">
+          <div class="tab-info">
+            <b>Was der Build macht.</b> Nur die f&uuml;r den Server markierten Dateien wandern mit,
+            fremde Bilder werden heruntergeladen und lokal eingebunden, grosse Bilder verkleinert,
+            Dateinamen ges&auml;ubert, Editor-Werkzeuge entfernt und das SEO eingepr&auml;gt.
+            Die Quelle bleibt unber&uuml;hrt.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KI-Endprüfung -->
+    <section class="panel" data-panel="endpruefung">
+      <div class="panel-scroll">
+        <div class="tab-info">
+          <b>Der letzte Blick vor dem Go-Live.</b> Gepr&uuml;ft wird der fertige <b>Build</b> &ndash;
+          erst mechanisch (kaputte Verweise, doppelte Meta-Angaben, Sitemap, Zugangsdaten),
+          dann durch das rechts gew&auml;hlte KI-Modell: Code-Fehler und Redundanz, Sicherheit
+          (besonders PHP) und ob die SEO-Angaben aus SiteSett inhaltlich Sinn ergeben.
+          &Auml;ndert sich danach die Quelle, gilt die Pr&uuml;fung als veraltet.
+        </div>
+        <div class="werkzeugzeile">
+          <button class="btn klein primary" id="btnPruefung" title="Dauert je nach Modell 1&ndash;3 Minuten. Kosten: grob 10&ndash;60 Rappen je nach Modell.">Endpr&uuml;fung starten</button>
+          <span class="titel" id="pruefStatus" style="flex:1">Noch keine Pr&uuml;fung gelaufen.</span>
+        </div>
+        <div id="pruefBericht"></div>
+      </div>
+    </section>
+
+    <!-- SEO -->
+    <section class="panel" data-panel="seo">
+      <div class="panel-scroll">
+        <div class="werkzeugzeile">
+          <button class="btn klein" id="btnSitesett" title="Liest eine sitesett-config.json ein und ersetzt die Tabelle hier komplett. Der API-Schl&uuml;ssel aus der Datei wird verworfen.">Aus SiteSett &uuml;bernehmen</button>
+          <button class="btn klein primary" id="btnKiFuellen" title="KI schl&auml;gt leere Titel und Beschreibungen vor. Geschrieben wird erst beim Build.">KI: fehlende Titel &amp; Beschreibungen</button>
+          <span class="titel" id="seoStatus" style="flex:1"></span>
+        </div>
+        <div class="befunde" id="seoInhalt" style="max-width:1100px">
+          <div class="tab-info">
+            <b>Hier pflegst du, was Google und die sozialen Netzwerke sehen.</b>
+            Gespeichert wird beim Verlassen eines Feldes &ndash; geschrieben erst beim Build,
+            nur in den Build, nie in die Quelle. Richtwerte: Titel 50&ndash;60 Zeichen,
+            Beschreibung 120&ndash;160 Zeichen.
+          </div>
+          <div class="karte">
+            <h4>Site-Profil</h4>
+            <div class="seo-profil" id="seoProfil"></div>
+          </div>
+          <div class="karte">
+            <h4>Seiten <span class="z" id="seoSeitenZahl"></span></h4>
+            <div id="seoSeiten"></div>
+          </div>
+          <div class="karte">
+            <h4>Weiterleitungen alter Adressen <span class="z" id="seoRedirZahl"></span></h4>
+            <div class="karten-inhalt">
+              <p class="karten-hinweis" style="margin:0 0 8px">
+                Eine je Zeile: <code>/alte-adresse.php /neue-adresse.html</code> &ndash;
+                landet als 301 in der .htaccess, damit Google und alte Links umziehen.</p>
+              <textarea id="seoRedirects" rows="6" style="width:100%;font-family:var(--mono);font-size:12px;
+                border:1px solid var(--line-strong);border-radius:10px;padding:10px"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- Bausteine (fuer VinWebMidi) -->
+    <section class="panel" data-panel="bausteine">
+      <div class="panel-scroll">
+        <div class="tab-info">
+          <b>Die Baustein-Bibliothek f&uuml;r VinWebMidi.</b>
+          VinWeb schl&auml;gt aus einer fertigen Seite die grossen Sektionen vor
+          (Hero, Galerie, CTA &hellip;). Du pr&uuml;fst die Miniatur, gibst einen
+          kundenfreundlichen Namen und gibst frei &ndash; aus genau diesen Bausteinen
+          komponiert die KI in Midi sp&auml;ter neue Unterseiten. Sie schreibt nie
+          eigenes HTML, darum kann das Design nicht brechen.
+        </div>
+        <div class="werkzeugzeile">
+          <label class="werkzeug-label">Seite:
+            <select id="bausteinSeite" style="max-width:320px"></select>
+          </label>
+          <button class="btn klein primary" id="btnBausteinAnalyse"
+            title="Liest die Seite und schl&auml;gt ihre Sektionen als Bausteine vor. Gespeichert wird erst beim Freigeben.">Sektionen vorschlagen</button>
+          <span class="titel" id="bausteinStatus" style="flex:1"></span>
+        </div>
+        <div class="karte" id="bausteinVorschlaege" hidden>
+          <h4>Vorschl&auml;ge <span class="z" id="vorschlagZahl"></span></h4>
+          <div id="vorschlagListe"></div>
+        </div>
+        <div class="karte">
+          <h4>Freigegebene Bausteine <span class="z" id="bibliothekZahl"></span></h4>
+          <div id="bibliothekListe"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ======================= KI-Spalte ======================= -->
+  <aside class="chat">
+    <div class="chat-kat"><i></i>Bearbeiten mit KI</div>
+    <div class="chat-kopf">
+      <select id="anbieter" title="KI-Anbieter &ndash; beide nutzen deine eigenen Schl&uuml;ssel">
+        <option value="anthropic">Claude</option>
+        <option value="openai">ChatGPT</option>
+      </select>
+      <select id="modell" title="Modell: ★ = das neuste. Faustregel: Sonnet/mini f&uuml;r Routine, Opus f&uuml;r Kniffliges" style="flex:1;min-width:0"></select>
+      <button class="btn klein" id="btnSchluessel" title="API-Schl&uuml;ssel verwalten">&#9881;</button>
+    </div>
+
+    <details class="chat-kontext" id="kontextBox" title="Welche Dateien die KI sieht. Fehlende fordert sie selbst an.">
+      <summary><span id="kontextText">Kontext: keine Seite</span></summary>
+      <div class="kontext-liste" id="kontextListe"></div>
+    </details>
+
+    <div class="chat-verlauf" id="chatVerlauf">
+      <div class="chat-leer">
+        Beschreibe hier, was ge&auml;ndert werden soll &ndash; zum Beispiel:<br>
+        <em>&bdquo;Erstelle eine neue Referenzseite f&uuml;r Kunde X nach dem Muster von
+        Referenz-prodorso.html&ldquo;</em><br><br>
+        Die KI schl&auml;gt vor, du gibst frei. Nichts wird ohne dich geschrieben.
+      </div>
+    </div>
+
+    <div class="chat-anhaenge" id="chatAnhaenge"></div>
+
+    <div class="chat-eingabe">
+      <button class="plus" id="btnPlus" title="Dateien oder Bilder anh&auml;ngen">+</button>
+      <textarea id="prompt" rows="3" placeholder="Was soll ge&auml;ndert werden?&#10;&#10;Enter = neue Zeile, Cmd+Enter = senden"></textarea>
+      <button class="btn primary klein" id="btnSenden" title="Senden (Cmd+Enter). W&auml;hrend die KI arbeitet: Stopp-Knopf.">Senden</button>
+    </div>
+    <input type="file" id="anhangDatei" multiple hidden>
+  </aside>
+</div>
+
+<dialog id="dlgSchluessel">
+  <form method="dialog" class="dlg">
+    <h2>API-Schl&uuml;ssel</h2>
+    <p class="dlg-info">
+      Die Schl&uuml;ssel werden in <code id="schluesselPfad">~/.vinweb/keys.json</code> gespeichert,
+      lesbar nur f&uuml;r dich &ndash; nicht im Projekt und nicht im Repo.
+    </p>
+    <label>Claude <small>(console.anthropic.com)</small></label>
+    <div class="dlg-zeile">
+      <input type="password" id="keyAnthropic" placeholder="sk-ant-..." autocomplete="off">
+      <span class="dlg-status" id="statusAnthropic"></span>
+    </div>
+    <label>ChatGPT <small>(platform.openai.com)</small></label>
+    <div class="dlg-zeile">
+      <input type="password" id="keyOpenai" placeholder="sk-..." autocomplete="off">
+      <span class="dlg-status" id="statusOpenai"></span>
+    </div>
+    <label>GitHub-Token <small>(Fernlager-Sync; github.com &rarr; Settings &rarr; Developer settings &rarr; Fine-grained token mit Contents-Schreibrecht)</small></label>
+    <div class="dlg-zeile">
+      <input type="password" id="keyGithub" placeholder="github_pat_&hellip; oder ghp_&hellip;" autocomplete="off">
+      <span class="dlg-status" id="statusGithub"></span>
+    </div>
+    <label>Notbremse je Anfrage <small>(automatisch stoppen ab &hellip; $)</small></label>
+    <div class="dlg-zeile">
+      <input type="number" id="kostenLimit" min="0" step="0.1" placeholder="leer = nie stoppen" style="font-family:inherit">
+      <span class="dlg-status">$ pro Anfrage</span>
+    </div>
+    <p class="dlg-info">Tipp: Setze zus&auml;tzlich beim Anbieter ein monatliches Ausgabenlimit.</p>
+    <div class="dlg-knopfe">
+      <button class="btn" value="abbrechen">Schliessen</button>
+      <button class="btn primary" id="btnKeySpeichern" value="speichern" type="button">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

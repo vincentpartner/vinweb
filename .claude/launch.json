@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vinweb",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start"
+      ],
+      "port": 4400
+    },
+    {
+      "name": "vinwebmini",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "/Users/retopuma/Downloads/Apps/Webdesign/VinWeb Mini"
+      ],
+      "port": 4500
+    }
+  ]
+}

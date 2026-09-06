@@ -1,0 +1,26 @@
+diff --git a/assets/swiss.css b/assets/swiss.css
+index cb43753..32ef803 100644
+--- a/assets/swiss.css
++++ b/assets/swiss.css
+@@ -222,7 +222,7 @@ html.vp-brush ::selection { background: var(--accent); color: #fff; }
+ .brand {
+   font-family: var(--font-head);
+   font-weight: var(--weight-head, 700);
+-  text-transform: uppercase;
++  text-transform: none; /* Wortmarke folgt der Schreibweise im Dokument */
+   letter-spacing: -0.05em;
+   font-size: 32px;
+   line-height: 0.74;
+@@ -230,8 +230,10 @@ html.vp-brush ::selection { background: var(--accent); color: #fff; }
+   flex-direction: column;
+   white-space: nowrap;
+ }
+-.brand b { font-weight: 900; display: block; color: var(--ink-head, var(--ink)); }
+-.brand .sub { font-size: 0.5em; font-weight: 700; letter-spacing: -0.02em; align-self: flex-end; color: var(--ink-head, var(--ink)); }
++/* "Vincent": bewusst eine Stufe kraeftiger als die h1-Titel (700 statt 600). */
++.brand b { font-weight: 700; display: block; color: var(--ink-head, var(--ink)); }
++/* "&Partner": halb so gross, linksbuendig unter "Vincent". */
++.brand .sub { font-size: 0.5em; font-weight: 400; letter-spacing: -0.02em; align-self: flex-start; color: var(--ink-head, var(--ink)); }
+ /* Logo follows the TITLE colour (--ink-head) by default — including the &.
+    The accent & returns only when explicitly enabled in the editor (accent-logo
+    tweak or an accent gradient). */
