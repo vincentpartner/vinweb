@@ -319,7 +319,9 @@ const LOESUNGEN = {
     art: 'chat',
     text: 'Im Chat verlinken lassen – z. B.: «Verlinke seite-x.html in der Fusszeile '
       + '(assets/footer.js)» oder «Füge auf referenzen.html eine Karte für seite-x.html ein». '
-      + 'Nicht mehr gebrauchte Seiten stattdessen über die Seitenliste löschen.',
+      + 'Nicht mehr gebrauchte Seiten stattdessen über die Seitenliste löschen. Soll eine Seite '
+      + 'ABSICHTLICH unverlinkt bleiben (interne Doku, Kampagnen-Landing), füge im Quelltext den '
+      + 'Kommentar «vinweb:absichtlich-unverlinkt» ein – dann schweigt dieser Befund.',
   },
   'sprachen': {
     art: 'hinweis',
