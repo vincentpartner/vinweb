@@ -315,6 +315,12 @@ const LOESUNGEN = {
     text: 'Im Reiter SEO pflegen – am schnellsten über «KI: fehlende Titel & Beschreibungen», '
       + 'dann jede Beschreibung kurz gegenlesen (120–160 Zeichen, aktiver Ton).',
   },
+  'waisen': {
+    art: 'chat',
+    text: 'Im Chat verlinken lassen – z. B.: «Verlinke seite-x.html in der Fusszeile '
+      + '(assets/footer.js)» oder «Füge auf referenzen.html eine Karte für seite-x.html ein». '
+      + 'Nicht mehr gebrauchte Seiten stattdessen über die Seitenliste löschen.',
+  },
   'sprachen': {
     art: 'hinweis',
     text: 'Bewusst zurückgestellt: Erst geht Deutsch live, dann bauen wir die Sprachstufe '
