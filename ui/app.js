@@ -1731,8 +1731,13 @@ $('#btnSitesett').onclick = async () => {
     seoDaten = daten.seo
     seoZeichnen()
     const u = daten.uebernommen
-    $('#seoStatus').textContent = `Übernommen: ${u.seiten} Seiten, ${u.redirects} Weiterleitungen`
-      + (u.schluesselVerworfen ? ' – der API-Schlüssel aus der Datei wurde verworfen.' : '.')
+    const teile = [`Übernommen: ${u.seiten} Seiten, ${u.redirects} Weiterleitungen`]
+    if (u.bilder) teile.push(`${u.bilder} Bild(er) ins Projekt gelegt`)
+    if (u.geschuetzteSeiten || u.geschuetzteFelder) {
+      teile.push(`Handarbeit geschützt: ${u.geschuetzteSeiten} Seite(n), ${u.geschuetzteFelder} Feld(er) blieben erhalten`)
+    }
+    if (u.schluesselVerworfen) teile.push('API-Schlüssel aus der Datei verworfen')
+    $('#seoStatus').textContent = teile.join(' · ')
   } catch (e) {
     $('#seoStatus').textContent = 'Fehlgeschlagen: ' + e.message
   }

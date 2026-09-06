@@ -18,7 +18,7 @@ import { zipImportieren, projektLoeschen } from './lib/importer.js'
 import { projektAnalysieren } from './lib/analyze.js'
 import { buildErzeugen, buildPfad } from './lib/build.js'
 import { ernten, ERNTE_DIR } from './lib/ernte.js'
-import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden } from './lib/seo.js'
+import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren } from './lib/seo.js'
 import { fortschrittBerechnen, SCHRITTE } from './lib/fortschritt.js'
 import { endpruefungLaufen } from './lib/endpruefung.js'
 import { GEHEIM_DATEINAME } from './lib/geheim.js'
@@ -826,7 +826,10 @@ app.post('/api/projekte/:id/seo/import-sitesett', async (req, res) => {
     if (!/\.json$/i.test(pfad)) return res.status(400).json({ fehler: 'Das ist keine JSON-Datei.' })
     const daten = JSON.parse(await fs.readFile(pfad, 'utf8'))
     const { seo, dateien } = ausSiteSett(daten)
-    projekt.seo = seo
+    // Zusammenführen statt überschreiben: Handarbeit aus dem SEO-Reiter und
+    // Seiten, die SiteSett nicht kennt, bleiben erhalten.
+    const { seo: vereint, geschuetzt } = seoZusammenfuehren(projekt.seo, seo)
+    projekt.seo = vereint
 
     // Bilder aus der Config (OG-Bilder, Favicon) als echte Dateien in die
     // Quelle legen – das sind Inhalte, keine Metadaten. Sie gehören ins
@@ -855,6 +858,8 @@ app.post('/api/projekte/:id/seo/import-sitesett', async (req, res) => {
         bilder,
         favicon: projekt.seo.site.faviconDatei || null,
         mitFaq: Object.values(projekt.seo.pages).filter(x => x.faqs?.length).length,
+        geschuetzteSeiten: geschuetzt.seiten,
+        geschuetzteFelder: geschuetzt.felder,
         schluesselVerworfen: Boolean(daten.ai?.apiKey),
       },
     })
