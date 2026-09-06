@@ -1398,6 +1398,7 @@ function buildAusliefererFuer (id) {
   if (!buildCache.has(id)) {
     buildCache.set(id, express.static(buildPfad(id), {
       index: ['index.html'],
+      extensions: ['html'],    // saubere Adressen: /kontakt findet kontakt.html
       dotfiles: 'allow',       // die Slot-Sidecars (.state.json) gehören zur Website
       etag: false,
       setHeaders: (res) => res.setHeader('Cache-Control', 'no-store'),
