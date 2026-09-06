@@ -2415,3 +2415,111 @@ $('#btnFernTrennen').onclick = async () => {
   status('Fernlager getrennt.', 'ok')
   fernlagerLaden()
 }
+
+// ---------------------------------------------------------------------------
+// Design-Update: ZIP gegen das offene Projekt vergleichen und gezielt übernehmen
+// ---------------------------------------------------------------------------
+
+$('#btnVergleich').onclick = async () => {
+  if (!aktuell) return status('Zuerst ein Projekt öffnen.', 'err')
+  const pfad = $('#vergleichPfad').value.trim()
+  if (!pfad) return status('Bitte den Pfad zum ZIP angeben.', 'err')
+  status('Vergleiche …')
+  try {
+    const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/vergleich`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pfad }),
+    })
+    const m = await antwort.json()
+    if (!antwort.ok) throw new Error(m.fehler)
+    vergleichZeigen(m)
+    status(`Vergleich fertig: ${m.neu.length} neu, ${m.geaendert.length} geändert, `
+      + `${m.konflikte.length} Konflikt(e), ${m.gleich} unverändert.`, 'ok')
+  } catch (e) {
+    status('Vergleich fehlgeschlagen: ' + e.message, 'err')
+  }
+}
+
+function vergleichZeigen (m) {
+  const alteOverlay = document.querySelector('.v-overlay')
+  if (alteOverlay) alteOverlay.remove()
+
+  const overlay = el('div', 'v-overlay')
+  const dialog = el('div', 'v-dialog')
+  dialog.appendChild(el('div', 'vd-kopf', `Design-Update aus ${m.zip}`))
+  const inhalt = el('div', 'vd-inhalt')
+
+  const gewaehlt = new Set()
+  const gruppe = (titel, liste, vorgewaehlt, warnKlasse) => {
+    if (!liste.length) return
+    const g = el('div', 'v-gruppe')
+    g.appendChild(el('h5', null, `${titel} (${liste.length})`))
+    for (const d of liste) {
+      const zeile = el('label', 'v-zeile' + (warnKlasse ? ' warn' : ''))
+      const cb = document.createElement('input')
+      cb.type = 'checkbox'
+      cb.checked = vorgewaehlt
+      if (vorgewaehlt) gewaehlt.add(d.rel)
+      cb.onchange = () => { cb.checked ? gewaehlt.add(d.rel) : gewaehlt.delete(d.rel) }
+      zeile.appendChild(cb)
+      zeile.appendChild(el('span', null, d.rel))
+      zeile.appendChild(el('span', 'g', d.bytes < 1024 ? d.bytes + ' B' : Math.round(d.bytes / 1024) + ' KB'))
+      g.appendChild(zeile)
+    }
+    inhalt.appendChild(g)
+  }
+
+  gruppe('Neu – im Projekt noch nicht vorhanden', m.neu, true, false)
+  gruppe('Geändert – nur in Claude Design angepasst', m.geaendert, true, false)
+  gruppe('⚠ Konflikt – auch in VinWeb geändert (Übernehmen überschreibt deine VinWeb-Arbeit)', m.konflikte, false, true)
+
+  if (m.geloescht.length) {
+    const g = el('div', 'v-gruppe')
+    g.appendChild(el('h5', null, `Im ZIP nicht mehr vorhanden (${m.geloescht.length}) – wird NICHT automatisch gelöscht`))
+    for (const rel of m.geloescht.slice(0, 20)) {
+      const zeile = el('div', 'v-zeile')
+      zeile.appendChild(el('span', null, rel))
+      g.appendChild(zeile)
+    }
+    if (m.geloescht.length > 20) g.appendChild(el('div', 'v-zeile', `… und ${m.geloescht.length - 20} weitere`))
+    inhalt.appendChild(g)
+  }
+
+  if (!m.neu.length && !m.geaendert.length && !m.konflikte.length) {
+    inhalt.appendChild(el('p', 'karten-hinweis', 'Keine Unterschiede zum Übernehmen – Projekt und ZIP sind inhaltlich gleich.'))
+  }
+  dialog.appendChild(inhalt)
+
+  const fuss = el('div', 'vd-fuss')
+  const ok = el('button', 'btn klein primary', 'Auswahl übernehmen')
+  ok.onclick = async () => {
+    if (!gewaehlt.size) return status('Nichts ausgewählt.', 'err')
+    ok.disabled = true
+    try {
+      const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/vergleich/uebernehmen`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ dateien: [...gewaehlt] }),
+      })
+      const d = await antwort.json()
+      if (!antwort.ok) throw new Error(d.fehler)
+      overlay.remove()
+      status(`${d.uebernommen.length} Datei(en) übernommen – als Stand im Verlauf gesichert.`, 'ok')
+      await projekteLaden(aktuell.id)
+    } catch (e) {
+      ok.disabled = false
+      status('Übernahme fehlgeschlagen: ' + e.message, 'err')
+    }
+  }
+  const abbruch = el('button', 'btn klein', 'Abbrechen')
+  abbruch.onclick = () => overlay.remove()
+  fuss.appendChild(ok)
+  fuss.appendChild(abbruch)
+  fuss.appendChild(el('span', 'karten-hinweis', `${m.gleich} Datei(en) unverändert`))
+  dialog.appendChild(fuss)
+
+  overlay.appendChild(dialog)
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
+  document.body.appendChild(overlay)
+}

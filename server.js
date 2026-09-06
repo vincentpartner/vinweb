@@ -15,6 +15,7 @@ import fs from 'node:fs/promises'
 import { UI_PORT, PREVIEW_PORT, HOST, ROOT, PROJECTS_DIR, AUTO_SICHERN_SEKUNDEN } from './lib/config.js'
 import { projekteAuflisten, projektLesen, projektSchreiben, quellPfad } from './lib/projects.js'
 import { zipImportieren, projektLoeschen } from './lib/importer.js'
+import { vergleichErstellen, vergleichUebernehmen } from './lib/vergleich.js'
 import { projektAnalysieren } from './lib/analyze.js'
 import { buildErzeugen, buildPfad } from './lib/build.js'
 import { ernten, ERNTE_DIR } from './lib/ernte.js'
@@ -780,6 +781,46 @@ app.post('/api/projekte/:id/endpruefung', async (req, res) => {
     res.end()
   }
 })
+
+// ---------------------------------------------------------------------------
+// Design-Update: frisches ZIP gegen das Projekt vergleichen und gezielt übernehmen
+// ---------------------------------------------------------------------------
+
+app.post('/api/projekte/:id/vergleich', async (req, res) => {
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    const roh = String(req.body?.pfad || '').trim().replace(/^['"]|['"]$/g, '')
+    const pfad = roh.startsWith('~') ? path.join(process.env.HOME || '', roh.slice(1)) : roh
+    if (!/\.zip$/i.test(pfad)) return res.status(400).json({ fehler: 'Das ist keine ZIP-Datei.' })
+    res.json(await vergleichErstellen(req.params.id, pfad))
+  } catch (e) {
+    res.status(400).json({ fehler: e.code === 'ENOENT' ? 'Datei nicht gefunden.' : e.message })
+  }
+})
+
+app.post('/api/projekte/:id/vergleich/uebernehmen', (req, res) => nacheinander(req.params.id, async () => {
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    const gewaehlt = Array.isArray(req.body?.dateien) ? req.body.dateien : []
+    if (!gewaehlt.length) return res.status(400).json({ fehler: 'Nichts ausgewählt.' })
+
+    // Erst festhalten, was von aussen offen ist – dann übernehmen, dann sichern.
+    if (await istRepo(req.params.id)) await sichern(req.params.id, 'Änderungen von aussen')
+    const ergebnis = await vergleichUebernehmen(req.params.id, gewaehlt)
+    if (await istRepo(req.params.id)) {
+      await sichern(req.params.id,
+        `Design-Update aus ${ergebnis.zip}: ${ergebnis.uebernommen.length} Datei(en) übernommen`)
+    }
+    projekt.analyse = await projektAnalysieren(req.params.id)
+    projekt.letzteAenderung = new Date().toISOString()
+    await projektSchreiben(req.params.id, projekt)
+    res.json({ ...ergebnis, projekt })
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+}))
 
 // ---------------------------------------------------------------------------
 // SEO: Site-Profil, Seiten-Metadaten, Weiterleitungen
