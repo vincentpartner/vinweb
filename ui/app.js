@@ -588,7 +588,7 @@ zone.addEventListener('drop', (e) => {
   const datei = e.dataTransfer.files[0]
   if (!datei) return
   if (!/\.zip$/i.test(datei.name)) return status('Bitte eine ZIP-Datei ablegen.', 'err')
-  zipHochladen(datei)
+  importOderVergleich(datei, null)
 })
 // Verhindert, dass der Browser eine daneben abgelegte Datei einfach oeffnet.
 document.addEventListener('dragover', (e) => e.preventDefault())
