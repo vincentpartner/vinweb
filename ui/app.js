@@ -46,6 +46,23 @@ async function sseLesen (antwort, handler) {
   }
 }
 
+// Sperrt einen Knopf während einer Aktion, zeigt Drehring + Zwischentext und
+// verhindert Doppelklicks. Gibt den Rückgabewert der Aufgabe weiter.
+async function mitLader (knopf, textWaehrend, aufgabe) {
+  if (!knopf || knopf.classList.contains('laedt')) return
+  const vorherText = knopf.textContent
+  knopf.classList.add('laedt')
+  knopf.disabled = true
+  if (textWaehrend) knopf.textContent = textWaehrend
+  try {
+    return await aufgabe()
+  } finally {
+    knopf.classList.remove('laedt')
+    knopf.disabled = false
+    knopf.textContent = vorherText
+  }
+}
+
 function status (text, art = '') {
   const s = $('#status')
   s.textContent = text
@@ -608,13 +625,13 @@ $('#btnZip').onclick = () => {
   location.href = `/api/projekte/${encodeURIComponent(aktuell.id)}/zip`
 }
 
-$('#btnAnalyse').onclick = async () => {
+$('#btnAnalyse').onclick = () => mitLader($('#btnAnalyse'), 'Prüfe …', async () => {
   if (!aktuell) return
   status('Prüfe erneut …')
   const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/analyse`, { method: 'POST' })
   if (!antwort.ok) return status('Prüfung fehlgeschlagen.', 'err')
   await projektOeffnen(aktuell.id)
-}
+})
 
 for (const knopf of document.querySelectorAll('.reiter button')) {
   knopf.onclick = () => {
@@ -1293,7 +1310,7 @@ function standZeichnen (s, istAktuell) {
     kopf.appendChild(ansehen)
 
     const zurueck = el('button', 'btn klein primary', 'Zurück zu diesem Stand')
-    zurueck.onclick = () => standZurueck(s)
+    zurueck.onclick = () => mitLader(zurueck, 'Setze zurück …', () => standZurueck(s))
     kopf.appendChild(zurueck)
   }
   karte.appendChild(kopf)
@@ -1327,7 +1344,7 @@ async function standAnsehen (karte, s, knopf) {
         const zeile = el('div', 's-datei')
         zeile.appendChild(el('span', null, datei))
         const nur = el('button', 'btn klein', 'nur diese Datei zurück')
-        nur.onclick = () => dateiZurueck(s, datei)
+        nur.onclick = () => mitLader(nur, '…', () => dateiZurueck(s, datei))
         zeile.appendChild(nur)
         liste.appendChild(zeile)
       }
@@ -1427,7 +1444,7 @@ $('#btnSichern').onclick = () => {
   if (!aktuell) return status('Zuerst ein Projekt laden.', 'err')
   jetztSichern($('#standName').value.trim() || 'Stand gesichert')
 }
-$('#btnJetztSichern').onclick = () => jetztSichern('Änderungen von aussen')
+$('#btnJetztSichern').onclick = () => mitLader($('#btnJetztSichern'), 'Sichere …', () => jetztSichern('Änderungen von aussen'))
 $('#standName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnSichern').click() })
 $('#standDatum').onchange = (e) => { tagFilter = e.target.value; verlaufZeichnen() }
 $('#btnDatumWeg').onclick = () => { tagFilter = ''; $('#standDatum').value = ''; verlaufZeichnen() }
@@ -1570,7 +1587,7 @@ function quelleOderBuild (build) {
   vorschauBauen()
 }
 
-$('#btnBuildErzeugen').onclick = buildErstellen
+$('#btnBuildErzeugen').onclick = () => mitLader($('#btnBuildErzeugen'), 'Baue & optimiere …', buildErstellen)
 $('#btnBuildAnsehen').onclick = () => {
   document.querySelector('.reiter button[data-reiter="vorschau"]').click()
   quelleOderBuild(true)
@@ -1788,7 +1805,7 @@ $('#btnSitesett').onclick = async () => {
   }
 }
 
-$('#btnKiFuellen').onclick = async () => {
+$('#btnKiFuellen').onclick = () => mitLader($('#btnKiFuellen'), 'KI schreibt …', async () => {
   if (!aktuell) return
   if (!$('#modell').value) return status('Zuerst einen API-Schlüssel hinterlegen (⚙).', 'err')
   $('#btnKiFuellen').disabled = true
@@ -1811,7 +1828,7 @@ $('#btnKiFuellen').onclick = async () => {
   } finally {
     $('#btnKiFuellen').disabled = false
   }
-}
+})
 
 
 // ---------------------------------------------------------------------------

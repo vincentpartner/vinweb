@@ -613,3 +613,10 @@ select, input[type=text], input[type=password], input[type=number], input[type=d
   background:var(--ok-soft,#EAF4EF);border:1px solid #CDE7DC;color:var(--ok,#1F7A5A)}
 .karten-stand.fehler{background:var(--accent-soft,#FBE9E2);border-color:#F3CFC3;color:var(--accent-ink,#C8431F)}
 .karten-stand.laeuft{background:var(--blue-soft,#E9F0FB);border-color:#CFE0F6;color:var(--blue,#2C6BD4)}
+
+/* ---------- Lade-Zustand für Knöpfe: sperrt und dreht ---------- */
+.btn.laedt{position:relative;pointer-events:none;opacity:.75;padding-left:30px}
+.btn.laedt::before{content:"";position:absolute;left:9px;top:50%;width:12px;height:12px;
+  margin-top:-7px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;
+  animation:btndreh .7s linear infinite}
+@keyframes btndreh{to{transform:rotate(360deg)}}
