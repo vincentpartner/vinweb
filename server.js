@@ -805,6 +805,24 @@ app.post('/api/projekte/:id/endpruefung', async (req, res) => {
 // Design-Update: frisches ZIP gegen das Projekt vergleichen und gezielt übernehmen
 // ---------------------------------------------------------------------------
 
+// Vergleich per Browser-Upload (Dateiwähler / Hineinziehen) – der Browser
+// kennt keine Mac-Pfade, also kommt das ZIP als Rohdaten.
+app.post('/api/projekte/:id/vergleich-upload',
+  express.raw({ type: 'application/octet-stream', limit: '500mb' }),
+  async (req, res) => {
+    try {
+      const projekt = await projektLesen(req.params.id)
+      if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ fehler: 'Keine Daten empfangen.' })
+      }
+      const name = decodeURIComponent(req.get('x-dateiname') || 'Upload.zip')
+      res.json(await vergleichErstellen(req.params.id, req.body, name))
+    } catch (e) {
+      res.status(400).json({ fehler: e.message })
+    }
+  })
+
 app.post('/api/projekte/:id/vergleich', async (req, res) => {
   try {
     const projekt = await projektLesen(req.params.id)

@@ -2429,11 +2429,63 @@ $('#btnFernTrennen').onclick = async () => {
 // Design-Update: ZIP gegen das offene Projekt vergleichen und gezielt übernehmen
 // ---------------------------------------------------------------------------
 
+// Statuszeile direkt in der Karte – Feedback dort, wo man gerade arbeitet.
+function vergleichStand (text, art) {
+  const z = $('#vergleichStand')
+  z.hidden = false
+  z.className = 'karten-stand' + (art ? ' ' + art : '')
+  z.textContent = text
+}
+
+function vergleichErgebnisMelden (m) {
+  vergleichZeigen(m)
+  const summe = m.neu.length + m.geaendert.length + m.konflikte.length
+  vergleichStand(summe === 0
+    ? `Fertig: keine Unterschiede – Projekt und ZIP sind inhaltlich gleich (${m.gleich} Dateien geprüft).`
+    : `Fertig: ${m.neu.length} neu, ${m.geaendert.length} geändert, ${m.konflikte.length} Konflikt(e), `
+      + `${m.gleich} unverändert. Auswahl im Fenster treffen.`)
+}
+
+// Weg 1: Dateiwähler oder Hineinziehen (empfohlen)
+async function vergleichMitDatei (datei) {
+  if (!aktuell) return vergleichStand('Zuerst links oben ein Projekt wählen.', 'fehler')
+  if (!/\.zip$/i.test(datei.name)) return vergleichStand(datei.name + ' ist keine ZIP-Datei.', 'fehler')
+  vergleichStand(`«${datei.name}» wird hochgeladen und verglichen …`, 'laeuft')
+  try {
+    const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/vergleich-upload`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream', 'x-dateiname': encodeURIComponent(datei.name) },
+      body: datei,
+    })
+    const m = await antwort.json()
+    if (!antwort.ok) throw new Error(m.fehler)
+    vergleichErgebnisMelden(m)
+  } catch (e) {
+    vergleichStand('Vergleich fehlgeschlagen: ' + e.message, 'fehler')
+  }
+}
+
+$('#vergleichDrop').onclick = () => $('#vergleichDatei').click()
+$('#vergleichDatei').addEventListener('change', ev => {
+  const f = ev.target.files && ev.target.files[0]
+  ev.target.value = ''
+  if (f) vergleichMitDatei(f)
+})
+$('#vergleichDrop').addEventListener('dragover', ev => { ev.preventDefault(); ev.currentTarget.classList.add('aktiv') })
+$('#vergleichDrop').addEventListener('dragleave', ev => ev.currentTarget.classList.remove('aktiv'))
+$('#vergleichDrop').addEventListener('drop', ev => {
+  ev.preventDefault()
+  ev.currentTarget.classList.remove('aktiv')
+  const f = ev.dataTransfer.files && ev.dataTransfer.files[0]
+  if (f) vergleichMitDatei(f)
+})
+
+// Weg 2: Pfad von Hand (bleibt als Alternative)
 $('#btnVergleich').onclick = async () => {
-  if (!aktuell) return status('Zuerst ein Projekt öffnen.', 'err')
+  if (!aktuell) return vergleichStand('Zuerst links oben ein Projekt wählen.', 'fehler')
   const pfad = $('#vergleichPfad').value.trim()
-  if (!pfad) return status('Bitte den Pfad zum ZIP angeben.', 'err')
-  status('Vergleiche …')
+  if (!pfad) return vergleichStand('Bitte ZIP hineinziehen, anklicken – oder einen Pfad angeben.', 'fehler')
+  vergleichStand('Vergleiche …', 'laeuft')
   try {
     const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/vergleich`, {
       method: 'POST',
@@ -2442,11 +2494,9 @@ $('#btnVergleich').onclick = async () => {
     })
     const m = await antwort.json()
     if (!antwort.ok) throw new Error(m.fehler)
-    vergleichZeigen(m)
-    status(`Vergleich fertig: ${m.neu.length} neu, ${m.geaendert.length} geändert, `
-      + `${m.konflikte.length} Konflikt(e), ${m.gleich} unverändert.`, 'ok')
+    vergleichErgebnisMelden(m)
   } catch (e) {
-    status('Vergleich fehlgeschlagen: ' + e.message, 'err')
+    vergleichStand('Vergleich fehlgeschlagen: ' + e.message, 'fehler')
   }
 }
 
@@ -2515,6 +2565,8 @@ function vergleichZeigen (m) {
       if (!antwort.ok) throw new Error(d.fehler)
       overlay.remove()
       status(`${d.uebernommen.length} Datei(en) übernommen – als Stand im Verlauf gesichert.`, 'ok')
+      vergleichStand(`✓ ${d.uebernommen.length} Datei(en) übernommen und im Verlauf gesichert. `
+        + 'Nächster Schritt: Build erzeugen → Auf Staging stellen.')
       await projekteLaden(aktuell.id)
     } catch (e) {
       ok.disabled = false

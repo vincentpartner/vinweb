@@ -607,3 +607,9 @@ select, input[type=text], input[type=password], input[type=number], input[type=d
 .v-zeile{display:flex;align-items:center;gap:8px;padding:4px 0;font-family:var(--mono);font-size:12px}
 .v-zeile .g{color:var(--muted);margin-left:auto;font-size:11px}
 .v-zeile.warn{color:var(--warn)}
+
+/* Statuszeile direkt in einer Karte – Feedback dort, wo man hinschaut */
+.karten-stand{margin-top:10px;padding:10px 13px;border-radius:6px;font-size:13px;line-height:1.5;
+  background:var(--ok-soft,#EAF4EF);border:1px solid #CDE7DC;color:var(--ok,#1F7A5A)}
+.karten-stand.fehler{background:var(--accent-soft,#FBE9E2);border-color:#F3CFC3;color:var(--accent-ink,#C8431F)}
+.karten-stand.laeuft{background:var(--blue-soft,#E9F0FB);border-color:#CFE0F6;color:var(--blue,#2C6BD4)}

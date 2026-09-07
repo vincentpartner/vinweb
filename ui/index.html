@@ -85,10 +85,16 @@
         <div class="karte">
           <h4>Design-Update einspielen (Vergleich)</h4>
           <div class="karten-inhalt">
-            <div class="pfadzeile">
-              <input type="text" id="vergleichPfad" placeholder="~/Downloads/....zip">
+            <div class="dropzone" id="vergleichDrop">
+              <b>ZIP hierher ziehen</b>
+              oder klicken zum Ausw&auml;hlen
+            </div>
+            <input type="file" id="vergleichDatei" accept=".zip" hidden>
+            <div class="pfadzeile" style="margin-top:8px">
+              <input type="text" id="vergleichPfad" placeholder="oder Pfad einf&uuml;gen: ~/Downloads/....zip">
               <button class="btn klein" id="btnVergleich">Vergleichen</button>
             </div>
+            <div id="vergleichStand" class="karten-stand" hidden></div>
             <p class="karten-hinweis">H&auml;lt ein frisches Claude-Design-ZIP gegen das <b>offene Projekt</b>:
               Neues und Ge&auml;ndertes zum Ausw&auml;hlen, Konflikte mit VinWeb-Arbeit werden markiert.
               Kein Neuimport &ndash; der Verlauf bleibt erhalten.</p>
