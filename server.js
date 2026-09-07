@@ -1253,6 +1253,7 @@ const vorschau = express()
 // ---------------------------------------------------------------------------
 
 const BRIDGE_JS = `// VinWeb-Brücke für die eingebauten Bild-Editoren.
+window.__vinwebBridgeVersion = 4;
 // Erlaubt sind nur die .state.json-Sidecars am Projektstamm – das erzwingt
 // der Server, nicht dieses Skript.
 window.omelette = window.omelette || {};
@@ -1279,6 +1280,13 @@ document.addEventListener('click', function (e) {
   var slot = e.target && e.target.closest ? e.target.closest('image-slot') : null;
   if (!slot || slot.hasAttribute('data-filled') || !slot.hasAttribute('data-editable')) return;
   if (!slot.closest('a')) return;
+  // Der "Bild-URL"-Knopf der Komponente behält seinen eigenen Weg.
+  var pfadKette = e.composedPath ? e.composedPath() : [];
+  for (var i = 0; i < pfadKette.length; i++) {
+    var k = pfadKette[i];
+    if (k && k.classList && k.classList.contains('act-url')) return;
+    if (k && k.classList && k.classList.contains('urlbar')) return;
+  }
   e.preventDefault();
   e.stopPropagation();
   var eingabe = slot.shadowRoot && slot.shadowRoot.querySelector('input[type=file]');
@@ -1371,6 +1379,9 @@ document.addEventListener('click', function (e) {
 `
 
 vorschau.get('/__vinweb/bridge.js', (req, res) => {
+  // Nie cachen: sonst arbeiten Browser nach Brücken-Updates mit alten Fassungen
+  // weiter – "Fix wirkt bei mir nicht"-Effekte.
+  res.set('Cache-Control', 'no-store')
   res.type('application/javascript; charset=utf-8').send(BRIDGE_JS)
 })
 
