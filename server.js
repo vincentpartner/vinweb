@@ -615,10 +615,19 @@ app.post('/api/ernte', async (req, res) => {
     return res.end()
   }
   ernteLaeuft = true
+  // Stopp-Knopf: bricht der Browser die Anfrage ab, hört die Ernte auf
+  // (und schliesst sauber mit dem bisher Gesammelten ab).
+  const abbruch = new AbortController()
+  // res.close (nicht req.close): feuert erst, wenn die VERBINDUNG wirklich weg
+  // ist – req.close kann schon nach dem Einlesen des Bodys feuern und würde
+  // die Ernte fälschlich sofort stoppen.
+  res.on('close', () => { if (!res.writableEnded) abbruch.abort() })
   try {
     const bericht = await ernten({
       url: String(req.body?.url || ''),
       maxSeiten: Math.min(Number(req.body?.maxSeiten) || 60, 150),
+      nurSeite: Boolean(req.body?.nurSeite),
+      signal: abbruch.signal,
       onMeldung: (text) => senden('meldung', { text }),
     })
     senden('fertig', bericht)
@@ -627,6 +636,54 @@ app.post('/api/ernte', async (req, res) => {
   } finally {
     ernteLaeuft = false
     res.end()
+  }
+})
+
+// Alle bisherigen Ernten auflisten (für die Verwaltungs-Ansicht).
+app.get('/api/ernten', async (req, res) => {
+  try {
+    let eintraege = []
+    try {
+      eintraege = await fs.readdir(ERNTE_DIR, { withFileTypes: true })
+    } catch { return res.json([]) }
+    const raus = []
+    for (const e of eintraege) {
+      if (!e.isDirectory()) continue
+      try {
+        const b = JSON.parse(await fs.readFile(path.join(ERNTE_DIR, e.name, 'bericht.json'), 'utf8'))
+        raus.push({
+          name: e.name,
+          url: b.url || ('https://' + (b.host || e.name)),
+          erstelltAm: b.erstelltAm || null,
+          seiten: b.seiten ?? null,
+          bilder: b.bilder ?? null,
+          nurSeite: Boolean(b.nurSeite),
+          gestoppt: Boolean(b.gestoppt),
+          ordner: path.join(ERNTE_DIR, e.name),
+        })
+      } catch {
+        raus.push({ name: e.name, url: e.name, erstelltAm: null, ordner: path.join(ERNTE_DIR, e.name) })
+      }
+    }
+    raus.sort((a, b) => String(b.erstelltAm || '').localeCompare(String(a.erstelltAm || '')))
+    res.json(raus)
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+})
+
+// Eine Ernte endgültig löschen. Nur direkte Unterordner von ernte/.
+app.delete('/api/ernten/:name', async (req, res) => {
+  try {
+    const name = path.basename(String(req.params.name))
+    const ordner = path.join(ERNTE_DIR, name)
+    if (!path.resolve(ordner).startsWith(path.resolve(ERNTE_DIR) + path.sep)) {
+      return res.status(400).json({ fehler: 'Ungültiger Ordner.' })
+    }
+    await fs.rm(ordner, { recursive: true, force: true })
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
   }
 })
 

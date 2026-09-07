@@ -105,10 +105,15 @@
           <h4>Inhalte einer bestehenden Website ernten</h4>
           <div class="karten-inhalt">
             <div class="pfadzeile">
-              <input type="text" id="ernteUrl" placeholder="www.kunde.ch">
+              <input type="text" id="ernteUrl" placeholder="www.kunde.ch oder www.kunde.ch/angebot">
               <button class="btn klein" id="btnErnte">Ernten</button>
+              <button class="btn klein" id="btnErnteStopp" hidden title="Bricht ab und beh&auml;lt das bisher Gesammelte">Stopp</button>
             </div>
+            <label class="ernte-modus" title="Nur die eingegebene Adresse ernten &ndash; ohne die &uuml;brigen Seiten der Website zu besuchen">
+              <input type="checkbox" id="ernteNurSeite"> Nur diese eine Seite (kein Durchsuchen der ganzen Website)
+            </label>
             <div id="ernteStand" class="karten-hinweis" style="margin-top:8px"></div>
+            <div id="ernteListe" style="margin-top:12px"></div>
             <p class="karten-hinweis">Sammelt Texte und Bilder als Rohstoff f&uuml;r den Neubau &ndash;
               mit Galerie zum Aussortieren. Beachtet robots.txt und l&auml;dt gedrosselt.</p>
           </div>

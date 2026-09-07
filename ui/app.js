@@ -1599,9 +1599,13 @@ $('#btnBuild').onclick = () => quelleOderBuild(true)
    Inhalte ernten – Texte und Bilder einer bestehenden Website
    =========================================================================== */
 
+let ernteAbbruch = null
+
 async function ernteStarten () {
   const url = $('#ernteUrl').value.trim()
   if (!url) return status('Bitte eine Adresse eingeben, z. B. www.kunde.ch', 'err')
+  ernteAbbruch = new AbortController()
+  $('#btnErnteStopp').hidden = false
 
   $('#btnErnte').disabled = true
   const stand = $('#ernteStand')
@@ -1611,7 +1615,8 @@ async function ernteStarten () {
     const antwort = await fetch('/api/ernte', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, nurSeite: $('#ernteNurSeite').checked }),
+      signal: ernteAbbruch.signal,
     })
     if (!antwort.ok || !antwort.body) throw new Error('Verbindung fehlgeschlagen.')
 
@@ -1640,17 +1645,68 @@ async function ernteStarten () {
       })
       stand.appendChild(document.createElement('br'))
       stand.appendChild(oeffnen)
-      status('Ernte abgeschlossen.', 'ok')
+      status(bericht.gestoppt ? 'Ernte gestoppt – Teilstand gespeichert.' : 'Ernte abgeschlossen.', 'ok')
     }
   } catch (e) {
-    stand.textContent = 'Fehlgeschlagen: ' + e.message
-    status('Ernte fehlgeschlagen: ' + e.message, 'err')
+    if (e.name === 'AbortError') {
+      stand.textContent = 'Gestoppt. Das bisher Gesammelte liegt im Ernte-Ordner (siehe Liste unten).'
+      status('Ernte gestoppt.', 'ok')
+    } else {
+      stand.textContent = 'Fehlgeschlagen: ' + e.message
+      status('Ernte fehlgeschlagen: ' + e.message, 'err')
+    }
   } finally {
+    $('#btnErnteStopp').hidden = true
+    ernteAbbruch = null
+    ernteListeLaden()
     $('#btnErnte').disabled = false
   }
 }
 
 $('#btnErnte').onclick = ernteStarten
+$('#btnErnteStopp').onclick = () => { ernteAbbruch?.abort(); $('#btnErnteStopp').hidden = true }
+
+// ---------------------------------------------------------------------------
+// Ernte-Verwaltung: Liste mit Datum, Adresse, Öffnen und Löschen
+// ---------------------------------------------------------------------------
+
+async function ernteListeLaden () {
+  const box = $('#ernteListe')
+  let liste = []
+  try { liste = await (await fetch('/api/ernten')).json() } catch { return }
+  box.innerHTML = ''
+  if (!Array.isArray(liste) || !liste.length) return
+  box.appendChild(el('div', 'pal-title', 'Bisherige Ernten'))
+  for (const e of liste) {
+    const zeile = el('div', 'ernte-zeile')
+    const wann = e.erstelltAm
+      ? new Date(e.erstelltAm).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+      : '–'
+    zeile.appendChild(el('span', 'wann', wann))
+    zeile.appendChild(el('span', 'wo', e.url + (e.nurSeite ? ' (eine Seite)' : '') + (e.gestoppt ? ' · gestoppt' : '')))
+    if (e.seiten != null) zeile.appendChild(el('span', 'zahlen', `${e.seiten} S. · ${e.bilder} B.`))
+    const oeffnen = el('button', 'btn klein', 'Öffnen')
+    oeffnen.onclick = () => fetch('/api/ernte/oeffnen', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ordner: e.ordner }),
+    })
+    const weg = el('button', 'btn klein', '✕')
+    weg.title = 'Diese Ernte endgültig löschen'
+    weg.onclick = async () => {
+      if (!confirm(`Ernte vom ${wann} (${e.url}) endgültig löschen?`)) return
+      await mitLader(weg, '…', async () => {
+        const r = await fetch('/api/ernten/' + encodeURIComponent(e.name), { method: 'DELETE' })
+        if (r.ok) { status('Ernte gelöscht.', 'ok'); ernteListeLaden() }
+        else status('Löschen fehlgeschlagen.', 'err')
+      })
+    }
+    zeile.appendChild(oeffnen)
+    zeile.appendChild(weg)
+    box.appendChild(zeile)
+  }
+}
+ernteListeLaden()
 $('#ernteUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') ernteStarten() })
 
 /* ===========================================================================
