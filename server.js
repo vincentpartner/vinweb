@@ -756,6 +756,12 @@ app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander('deploy:
     const projekt = await projektLesen(req.params.id)
     if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
     const meldungen = []
+    // Immer frisch bauen - damit kann NIE ein alter Stand hochgehen, und der
+    // Merksatz «erst Build, dann Staging» entfaellt ersatzlos.
+    meldungen.push('Erzeuge frischen Build …')
+    const buildBericht = await buildErzeugen(projekt)
+    if (projekt.seo) buildBericht.seo = await seoAnwenden(projekt.seo, buildPfad(req.params.id))
+    projekt.letzterBuild = buildBericht.erstelltAm
     const ergebnis = await deployAusfuehren(projekt, 'staging', (t) => meldungen.push(t))
     projekt.letzterStagingDeploy = ergebnis.am
     await projektSchreiben(req.params.id, projekt)
