@@ -537,9 +537,45 @@ async function pfadImportieren (pfad) {
 // Verdrahtung
 // ---------------------------------------------------------------------------
 
+// Schutz vor dem Doppel-Import-Fehler: Ist schon ein Projekt offen, fragt
+// der Import nach – meistens ist «Vergleichen» das Richtige, nicht ein
+// weiteres Projekt daneben.
+function importOderVergleich (datei, pfad) {
+  if (!aktuell) { datei ? zipHochladen(datei) : pfadImportieren(pfad); return }
+
+  const overlay = el('div', 'v-overlay')
+  const dialog = el('div', 'v-dialog')
+  dialog.appendChild(el('div', 'vd-kopf', 'Wohin mit diesem ZIP?'))
+  const inhalt = el('div', 'vd-inhalt')
+  const hinweis = el('p', 'karten-hinweis')
+  hinweis.style.fontSize = '13px'
+  hinweis.textContent = `Es ist bereits das Projekt «${aktuell.name}» geöffnet. `
+    + 'Ein Design-Update aus Claude Design gehört als VERGLEICH in dieses Projekt – '
+    + 'ein zweiter Import würde ein getrenntes Projekt ohne deinen Verlauf anlegen.'
+  inhalt.appendChild(hinweis)
+  dialog.appendChild(inhalt)
+
+  const fuss = el('div', 'vd-fuss')
+  const vgl = el('button', 'btn klein primary', `Mit «${aktuell.name}» vergleichen (empfohlen)`)
+  vgl.onclick = () => {
+    overlay.remove()
+    if (datei) vergleichMitDatei(datei)
+    else { $('#vergleichPfad').value = pfad; $('#btnVergleich').click() }
+  }
+  const neu = el('button', 'btn klein', 'Als NEUES Projekt importieren')
+  neu.onclick = () => { overlay.remove(); datei ? zipHochladen(datei) : pfadImportieren(pfad) }
+  const abbruch = el('button', 'btn klein', 'Abbrechen')
+  abbruch.onclick = () => overlay.remove()
+  fuss.appendChild(vgl); fuss.appendChild(neu); fuss.appendChild(abbruch)
+  dialog.appendChild(fuss)
+  overlay.appendChild(dialog)
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
+  document.body.appendChild(overlay)
+}
+
 const zone = $('#dropzone')
 zone.onclick = () => $('#datei').click()
-$('#datei').onchange = (e) => { if (e.target.files[0]) zipHochladen(e.target.files[0]) }
+$('#datei').onchange = (e) => { if (e.target.files[0]) importOderVergleich(e.target.files[0], null) }
 
 for (const ereignis of ['dragenter', 'dragover']) {
   zone.addEventListener(ereignis, (e) => { e.preventDefault(); zone.classList.add('aktiv') })
@@ -560,7 +596,7 @@ document.addEventListener('drop', (e) => e.preventDefault())
 
 $('#btnPfad').onclick = () => {
   const p = $('#pfad').value.trim()
-  if (p) pfadImportieren(p)
+  if (p) importOderVergleich(null, p)
 }
 $('#pfad').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnPfad').click() })
 
