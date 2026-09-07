@@ -86,6 +86,7 @@ async function projektOeffnen (id) {
   chatLeeren()
   verlaufLaden()
   textdateienLaden()
+  stagingKnoepfeZeigen()
   bausteineZaehlen()
   // Fernlager im Hintergrund abfragen: Hat der Kunde neue Stände hochgeladen?
   fernlagerLaden().then(() => {
@@ -2530,4 +2531,34 @@ function vergleichZeigen (m) {
   overlay.appendChild(dialog)
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
   document.body.appendChild(overlay)
+}
+
+// ---------------------------------------------------------------------------
+// Deploy: Build auf Staging stellen
+// ---------------------------------------------------------------------------
+
+function stagingKnoepfeZeigen () {
+  const d = aktuell?.deploy
+  const hat = Boolean(d?.host && d?.staging)
+  $('#btnStaging').hidden = !hat
+  $('#btnStagingOeffnen').hidden = !(hat && d.stagingUrl)
+  if (d?.stagingUrl) $('#btnStagingOeffnen').href = d.stagingUrl
+}
+
+$('#btnStaging').onclick = async () => {
+  if (!aktuell) return
+  const knopf = $('#btnStaging')
+  knopf.disabled = true
+  knopf.textContent = 'Wird übertragen …'
+  try {
+    const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/deploy/staging`, { method: 'POST' })
+    const d = await antwort.json()
+    if (!antwort.ok) throw new Error(d.fehler)
+    status(`Staging aktualisiert – ${d.uebertragen} Datei(en) übertragen. ` + (d.url ? d.url : ''), 'ok')
+  } catch (e) {
+    status('Staging-Deploy fehlgeschlagen: ' + e.message, 'err')
+  } finally {
+    knopf.disabled = false
+    knopf.textContent = 'Auf Staging stellen'
+  }
 }

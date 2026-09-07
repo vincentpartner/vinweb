@@ -247,6 +247,8 @@
           <button class="btn klein primary" id="btnBuildErzeugen" title="Erzeugt den Live-Stand neu. Quelle bleibt unber&uuml;hrt, dauert ca. 20 Sekunden.">Produktions-Build erstellen</button>
           <span class="titel" id="buildStatus" style="flex:1">Noch kein Build erstellt.</span>
           <button class="btn klein" id="btnBuildAnsehen" hidden title="Wechselt in die Vorschau und zeigt den fertigen Build">Build in Vorschau &ouml;ffnen</button>
+          <button class="btn klein" id="btnStaging" hidden title="Stellt den aktuellen Build per rsync auf die Test-Adresse. Suchmaschinen-Schutz wird automatisch gesetzt.">Auf Staging stellen</button>
+          <a class="btn klein" id="btnStagingOeffnen" hidden target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" title="Staging im Browser &ouml;ffnen">Staging &ouml;ffnen</a>
         </div>
         <div class="befunde" id="buildBericht">
           <div class="tab-info">

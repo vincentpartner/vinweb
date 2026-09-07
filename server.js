@@ -22,6 +22,7 @@ import { ernten, ERNTE_DIR } from './lib/ernte.js'
 import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren } from './lib/seo.js'
 import { fortschrittBerechnen, SCHRITTE } from './lib/fortschritt.js'
 import { endpruefungLaufen } from './lib/endpruefung.js'
+import { deployAusfuehren } from './lib/deploy.js'
 import { GEHEIM_DATEINAME } from './lib/geheim.js'
 import { execFile } from 'node:child_process'
 import { schluesselSetzen, schluesselUebersicht, schluesselHolen } from './lib/keys.js'
@@ -745,6 +746,24 @@ app.put('/api/projekte/:id/fortschritt', async (req, res) => {
     res.status(500).json({ fehler: e.message })
   }
 })
+
+// ---------------------------------------------------------------------------
+// Deploy: Build auf den Server stellen (vorerst nur Staging)
+// ---------------------------------------------------------------------------
+
+app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander('deploy:' + req.params.id, async () => {
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    const meldungen = []
+    const ergebnis = await deployAusfuehren(projekt, 'staging', (t) => meldungen.push(t))
+    projekt.letzterStagingDeploy = ergebnis.am
+    await projektSchreiben(req.params.id, projekt)
+    res.json({ ...ergebnis, meldungen })
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+}))
 
 // ---------------------------------------------------------------------------
 // KI-Endprüfung vor dem Go-Live
