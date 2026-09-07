@@ -1271,6 +1271,20 @@ window.omelette.writeFile = function (name, inhalt) {
 // und nur, wenn der alte Text dort GENAU EINMAL vorkommt - das erzwingt der
 // Server. JS-erzeugte Bereiche (z. B. die Fusszeile) lehnt er dadurch sauber ab.
 // ---------------------------------------------------------------------------
+// Erst-Upload für LEERE Bild-Slots, die in einem Link stecken (Referenz-
+// Karten): Ohne diesen Fänger würde der Klick zur verlinkten Seite
+// navigieren, statt den Datei-Dialog zu öffnen. Gefüllte Slots regeln das
+// selbst – leere nicht zuverlässig.
+document.addEventListener('click', function (e) {
+  var slot = e.target && e.target.closest ? e.target.closest('image-slot') : null;
+  if (!slot || slot.hasAttribute('data-filled') || !slot.hasAttribute('data-editable')) return;
+  if (!slot.closest('a')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var eingabe = slot.shadowRoot && slot.shadowRoot.querySelector('input[type=file]');
+  if (eingabe) eingabe.click();
+}, true);
+
 (function () {
   var TAGS = 'h1,h2,h3,h4,p,li,blockquote,figcaption,td,th,dt,dd,a,span,strong,em,b,small,button';
   var aktiv = null;   // { el, alt }
