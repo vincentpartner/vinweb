@@ -3,7 +3,7 @@
 Lokale Oberfläche, um einen Website-Export (ZIP aus Claude Design) zu importieren,
 zu prüfen, anzupassen und später über GitHub zu veröffentlichen.
 
-**Stand: Etappen 1–5** — Import, Analyse, Vorschau, Produktions-Build, SEO, KI-Anpassungen und Verlauf funktionieren. Offen: Etappe 6 (Deploy).
+**Stand: alle Etappen gebaut** — Import/Vergleich, Analyse, Vorschau mit Klick-Editoren, KI-Chat mit Diff-Freigabe, SEO (inkl. SiteSett-Import), Produktions-Build mit Einbacken und sauberen Adressen, KI-Endprüfung, Verlauf und Deploy (Staging via rsync/SSH). Details für Reviews: ENTWICKLER-CHECK.md.
 
 ## Starten
 
