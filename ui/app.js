@@ -1507,8 +1507,14 @@ function buildBerichtZeichnen (b) {
   box.appendChild(reihe)
 
   if (b.hinweise.length) {
+    // Review-Fund 1: Hinweise stammen teils aus Projektdaten (Sidecar-Schlüssel,
+    // Dateinamen) – dürfen NIE als HTML interpretiert werden.
     const h = el('div', 'hinweiskasten')
-    h.innerHTML = '<b>Zur Kenntnis:</b><br>' + b.hinweise.map(x => '• ' + x).join('<br>')
+    h.appendChild(el('b', null, 'Zur Kenntnis:'))
+    for (const x of b.hinweise) {
+      h.appendChild(document.createElement('br'))
+      h.appendChild(document.createTextNode('• ' + x))
+    }
     box.appendChild(h)
   }
 

@@ -22,7 +22,7 @@ import { ernten, ERNTE_DIR } from './lib/ernte.js'
 import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren } from './lib/seo.js'
 import { fortschrittBerechnen, SCHRITTE } from './lib/fortschritt.js'
 import { endpruefungLaufen } from './lib/endpruefung.js'
-import { deployAusfuehren } from './lib/deploy.js'
+import { deployAusfuehren, stagingSchutzEinbetten } from './lib/deploy.js'
 import { GEHEIM_DATEINAME } from './lib/geheim.js'
 import { execFile } from 'node:child_process'
 import { schluesselSetzen, schluesselUebersicht, schluesselHolen } from './lib/keys.js'
@@ -57,6 +57,24 @@ function nacheinander (id, aufgabe) {
 }
 
 const app = express()
+
+// Review-Fund 9: Schreibende Verwaltungsrouten nehmen nur Anfragen ohne
+// Browser-Herkunft (curl, eigene Werkzeuge) oder aus der eigenen Oberfläche
+// an. Ein Skript aus der VORSCHAU (Port 4401 = fremde Herkunft) kann damit
+// keine Builds, Deploys oder Löschungen mehr auslösen.
+app.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
+  const herkunft = req.get('origin')
+  if (!herkunft) return next()
+  try {
+    const h = new URL(herkunft)
+    if ((h.hostname === '127.0.0.1' || h.hostname === 'localhost') && h.port === String(UI_PORT)) {
+      return next()
+    }
+  } catch { /* unlesbare Herkunft -> ablehnen */ }
+  res.status(403).json({ fehler: 'Anfrage von fremder Herkunft abgelehnt.' })
+})
+
 app.use(express.json({ limit: '60mb' }))
 
 app.use(express.static(path.join(ROOT, 'ui')))
@@ -234,6 +252,13 @@ async function kontextBauen (projekt, seiten) {
         teile.push(`--- ${ziel.rel} --- (zu gross, ausgelassen)`)
         continue
       }
+      // Review-Fund 5: nicht nur der NAME, auch der INHALT wird geprüft –
+      // eine harmlos benannte Datei mit echtem Schlüssel bleibt draussen.
+      const fund = geheimnisImInhalt(inhalt)
+      if (fund) {
+        teile.push(`--- ${ziel.rel} --- (ausgelassen: enthält ${fund})`)
+        continue
+      }
       bytes += inhalt.length
       teile.push(`--- AKTUELLER INHALT VON ${ziel.rel} ---\n${inhalt}`)
     } catch { /* Datei nicht lesbar */ }
@@ -356,6 +381,8 @@ app.post('/api/chat', async (req, res) => {
         try {
           const inhalt = await fs.readFile(ziel.voll, 'utf8')
           if (inhalt.length > 300 * 1024) { verweigert.push(rel + ' (zu gross)'); continue }
+          const fund = geheimnisImInhalt(inhalt)
+          if (fund) { verweigert.push(rel + ' (enthält ' + fund + ')'); continue }
           teile.push(`--- AKTUELLER INHALT VON ${ziel.rel} ---\n${inhalt}`)
           geliefert.push(ziel.rel)
         } catch { verweigert.push(rel + ' (nicht gefunden)') }
@@ -808,7 +835,7 @@ app.put('/api/projekte/:id/fortschritt', async (req, res) => {
 // Deploy: Build auf den Server stellen (vorerst nur Staging)
 // ---------------------------------------------------------------------------
 
-app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander('deploy:' + req.params.id, async () => {
+app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander(req.params.id, async () => {
   try {
     const projekt = await projektLesen(req.params.id)
     if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
@@ -819,6 +846,9 @@ app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander('deploy:
     const buildBericht = await buildErzeugen(projekt)
     if (projekt.seo) buildBericht.seo = await seoAnwenden(projekt.seo, buildPfad(req.params.id))
     projekt.letzterBuild = buildBericht.erstelltAm
+    // Review-Fund 17: Schutz VOR der Übertragung in den Stand einbetten.
+    await stagingSchutzEinbetten(buildPfad(req.params.id))
+    meldungen.push('Staging-Schutz eingebettet (robots + X-Robots-Tag).')
     const ergebnis = await deployAusfuehren(projekt, 'staging', (t) => meldungen.push(t))
     projekt.letzterStagingDeploy = ergebnis.am
     await projektSchreiben(req.params.id, projekt)
@@ -851,8 +881,12 @@ app.post('/api/projekte/:id/endpruefung', async (req, res) => {
     const { anbieter, modell } = req.body || {}
     if (!anbieter || !modell) throw new Error('Bitte zuerst Anbieter und Modell wählen (rechts in der KI-Spalte).')
 
-    const bericht = await nacheinander('pruefung:' + req.params.id, () =>
-      endpruefungLaufen({ projekt, anbieter, modell, onMeldung: (t) => senden('meldung', { t }) }))
+    // Review-Fund 20: Verbindung weg -> Prüfung und KI-Aufrufe sofort stoppen.
+    const abbruch = new AbortController()
+    req.on('close', () => { if (!res.writableEnded) abbruch.abort() })
+    const bericht = await nacheinander(req.params.id, () =>
+      endpruefungLaufen({ projekt, anbieter, modell, signal: abbruch.signal, onMeldung: (t) => { if (!res.writableEnded) senden('meldung', { t }) } }))
+    if (abbruch.signal.aborted) return res.end()
 
     projekt.kiPruefung = bericht
     await projektSchreiben(req.params.id, projekt)
@@ -1435,14 +1469,29 @@ vorschau.get('/__vinweb/baustein.js', (req, res) => {
 // Nimmt die Sidecar-Daten der Editoren entgegen. Bewusst eng:
 // nur Dateinamen der Form ".xyz.state.json", nur am Projektstamm,
 // und durch die Projekt-Schlange – kollidiert nie mit Build oder Sicherung.
+// Review-Fund 8 (Teillösung): Das Skript einer Vorschau-Seite darf nur in
+// SEIN eigenes Projekt schreiben (Projekt aus dem Referer-Pfad), und die
+// Build-Ansicht (__build__) bleibt komplett schreibgeschützt.
+function vorschauSchreibrecht (req, projekt) {
+  const ref = req.get('referer') || ''
+  const m = ref.match(/^https?:\/\/[^/]+\/([^/?#]+)(\/[^?#]*)?/)
+  if (!m) return true   // kein Referer (eigenes Werkzeug) – zulassen
+  if (decodeURIComponent(m[1]) !== projekt) return false
+  if ((m[2] || '').startsWith('/__build__')) return false
+  return true
+}
+
 vorschau.post('/__vinweb/schreiben', express.json({ limit: '40mb' }), (req, res) => {
   const projekt = path.basename(String(req.body?.projekt || ''))
+  if (!vorschauSchreibrecht(req, projekt)) {
+    return res.status(403).json({ fehler: 'Schreiben nur ins eigene Projekt und nicht aus der Build-Ansicht.' })
+  }
   const name = path.basename(String(req.body?.name || ''))
   const inhalt = req.body?.inhalt
   if (!projekt || typeof inhalt !== 'string') {
     return res.status(400).json({ fehler: 'Unvollständige Anfrage.' })
   }
-  if (!/^\.[a-z0-9-]+\.state\.json$/i.test(name)) {
+  if (!/^\.[a-z0-9_-]+\.state\.json$/i.test(name)) {
     return res.status(403).json({ fehler: 'Nur .state.json-Dateien erlaubt.' })
   }
   return nacheinander(projekt, async () => {
@@ -1460,6 +1509,9 @@ vorschau.post('/__vinweb/schreiben', express.json({ limit: '40mb' }), (req, res)
 // Quelldatei GENAU EINMAL vorkommt – sonst Ablehnung statt Raterei.
 vorschau.post('/__vinweb/text', express.json({ limit: '1mb' }), (req, res) => {
   const projekt = path.basename(String(req.body?.projekt || ''))
+  if (!vorschauSchreibrecht(req, projekt)) {
+    return res.status(403).json({ fehler: 'Schreiben nur ins eigene Projekt und nicht aus der Build-Ansicht.' })
+  }
   const seite = String(req.body?.seite || '')
   const alt = String(req.body?.alt ?? '')
   const neu = String(req.body?.neu ?? '')
@@ -1491,7 +1543,9 @@ vorschau.post('/__vinweb/text', express.json({ limit: '1mb' }), (req, res) => {
             + 'Bitte über den Chat ändern (dort lässt sich die Stelle benennen).',
         })
       }
-      await fs.writeFile(ziel.voll, inhalt.replace(alt, neu), 'utf8')
+      // Review-Fund 23: Ersetzungstext wörtlich einsetzen – sonst würden
+      // $-Muster ($&, $1 …) aus Nutzereingaben interpretiert.
+      await fs.writeFile(ziel.voll, inhalt.replace(alt, () => neu), 'utf8')
       if (await istRepo(projekt)) {
         await sichern(projekt, 'Text angepasst: ' + ziel.rel)
       }
@@ -1546,6 +1600,25 @@ vorschau.use(async (req, res, next) => {
   }
   const teile = pfad.split('/').filter(Boolean)
 
+  // Review-Fund 2: Sperren arbeiten auf dem NORMALISIERTEN Pfad – ein
+  // angehängter Schrägstrich (/config.php/) darf sie nicht umgehen.
+  const relNorm = teile.join('/')
+  // Versteckte Dateien: nur die Editor-Sidecars sind öffentlich, sonst nichts
+  // (.env, .gitignore, Geheimnisse bleiben zu).
+  const basisName = teile[teile.length - 1] || ''
+  if (basisName.startsWith('.')
+    && !/^\.[a-z0-9_-]+\.state\.json$/i.test(basisName)
+    && basisName !== '.htaccess') {
+    return res.status(404).end()
+  }
+  if (/(^|\/)(config\.php|[^/]*-config\.php|\.env[^/]*|[^/]*credentials[^/]*|[^/]*secret[^/]*)$/i.test(relNorm)) {
+    return res.status(404).end()
+  }
+  if (/\.php$/i.test(relNorm)) {
+    return res.status(501).type('text/plain; charset=utf-8')
+      .send('PHP wird in der örtlichen Vorschau nicht ausgeführt.')
+  }
+
   if (teile.length === 0) {
     return res.status(404).type('text/plain; charset=utf-8')
       .send('VinWeb-Vorschau. Der Aufruf lautet /<projekt>/<seite>.')
@@ -1557,10 +1630,6 @@ vorschau.use(async (req, res, next) => {
   // Quelle. So lässt sich der Produktions-Stand ansehen, ohne die Quelle zu berühren.
   if (teile[1] === '__build__') {
     if (teile.some(t => t === '..' || t.toLowerCase() === '.git')) return res.status(404).end()
-    if (/\.php$/i.test(pfad)) {
-      return res.status(501).type('text/plain; charset=utf-8')
-        .send('PHP wird in der örtlichen Vorschau nicht ausgeführt.')
-    }
     req.url = '/' + teile.slice(2).map(encodeURIComponent).join('/') + (abfrage ? '?' + abfrage : '')
     return buildAusliefererFuer(id)(req, res, next)
   }
@@ -1572,13 +1641,6 @@ vorschau.use(async (req, res, next) => {
   // gleich behandelt. ".."-Segmente ebenfalls abweisen.
   if (teile.some(t => t === '..' || t.toLowerCase() === '.git')) {
     return res.status(404).end()
-  }
-
-  // PHP kann ein reiner Dateiserver nicht ausfuehren. Wir liefern die Datei
-  // bewusst NICHT als Text aus - in config.php stehen Zugangsdaten.
-  if (/\.php$/i.test(pfad)) {
-    return res.status(501).type('text/plain; charset=utf-8')
-      .send('PHP wird in der örtlichen Vorschau nicht ausgeführt. Auf dem Server funktioniert es.')
   }
 
   // HTML-Seiten der Quelle bekommen die Editor-Brücke eingesetzt – damit
