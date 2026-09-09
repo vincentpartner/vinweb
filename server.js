@@ -1064,7 +1064,8 @@ app.post('/api/projekte/:id/seo/ki-fuellen', async (req, res) => {
     // req.destroyed wäre schon nach dem Einlesen des Bodys wahr und würde die
     // Schleife sofort beenden – exakt derselbe Stolperstein wie beim Stopp-Knopf.
     let abgebrochen = false
-    res.on('close', () => { if (!res.writableEnded) abgebrochen = true })
+    const abbruchSeo = new AbortController()
+    res.on('close', () => { if (!res.writableEnded) { abgebrochen = true; abbruchSeo.abort() } })
     for (const [datei, p] of offen) {
       if (abgebrochen) break   // Browser weg -> keine weiteren Aufrufe bezahlen
       let inhalt = ''
@@ -1078,7 +1079,7 @@ app.post('/api/projekte/:id/seo/ki-fuellen', async (req, res) => {
       } catch { continue }
 
       const { text } = await chatStreamen({
-        anbieter, modell,
+        anbieter, modell, signal: abbruchSeo.signal,
         system: 'Du bist SEO-Spezialist für Schweizer Websites. Antworte NUR mit einem JSON-Objekt '
           + '{"titel": "...", "beschreibung": "..."} ohne weiteren Text. Schweizer Hochdeutsch (ss statt ß). '
           + 'Titel 50–60 Zeichen, wichtigstes Suchwort vorne. Beschreibung 120–160 Zeichen, aktiv, '
