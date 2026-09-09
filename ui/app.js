@@ -2731,10 +2731,10 @@ function vergleichZeigen (m) {
       const d = await antwort.json()
       if (!antwort.ok) throw new Error(d.fehler)
       overlay.remove()
-      banner(`✓ ${d.uebernommen.length} Datei(en) übernommen – im Verlauf gesichert. Weiter mit Build → Staging.`, 'ok')
+      banner(`✓ ${d.uebernommen.length} Datei(en) übernommen – im Verlauf gesichert. Weiter mit Build → Auf Testserver stellen.`, 'ok')
       status(`${d.uebernommen.length} Datei(en) übernommen – als Stand im Verlauf gesichert.`, 'ok')
       vergleichStand(`✓ ${d.uebernommen.length} Datei(en) übernommen und im Verlauf gesichert. `
-        + 'Nächster Schritt: Build erzeugen → Auf Staging stellen.')
+        + 'Nächster Schritt: Build erzeugen → Auf Testserver stellen.')
       await projekteLaden(aktuell.id)
     } catch (e) {
       ok.disabled = false
@@ -2770,17 +2770,17 @@ $('#btnStaging').onclick = async () => {
   const knopf = $('#btnStaging')
   knopf.disabled = true
   knopf.textContent = 'Wird übertragen …'
-  banner('Baue frisch und stelle auf Staging – dauert ~20 Sekunden …', 'laeuft')
+  banner('Baue frisch und stelle auf den Testserver – dauert ~20 Sekunden …', 'laeuft')
   try {
     const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/deploy/staging`, { method: 'POST' })
     const d = await antwort.json()
     if (!antwort.ok) throw new Error(d.fehler)
-    status(`Staging aktualisiert – ${d.uebertragen} Datei(en) übertragen. ` + (d.url ? d.url : ''), 'ok')
-    banner(`✓ Staging aktualisiert (${d.uebertragen} Datei(en)). Jetzt «Staging öffnen» und prüfen.`, 'ok')
+    status(`Testserver aktualisiert – ${d.uebertragen} Datei(en) übertragen. ` + (d.url ? d.url : ''), 'ok')
+    banner(`✓ Auf dem Testserver (${d.uebertragen} Datei(en)). Jetzt «Testserver öffnen» und im Netz prüfen.`, 'ok')
   } catch (e) {
-    status('Staging-Deploy fehlgeschlagen: ' + e.message, 'err')
+    status('Übertragung fehlgeschlagen: ' + e.message, 'err')
   } finally {
     knopf.disabled = false
-    knopf.textContent = 'Auf Staging stellen'
+    knopf.textContent = 'Auf Testserver stellen'
   }
 }
