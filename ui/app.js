@@ -48,14 +48,52 @@ async function sseLesen (antwort, handler) {
 
 // Sperrt einen Knopf während einer Aktion, zeigt Drehring + Zwischentext und
 // verhindert Doppelklicks. Gibt den Rückgabewert der Aufgabe weiter.
-async function mitLader (knopf, textWaehrend, aufgabe) {
+// ---------------------------------------------------------------------------
+// Einheitliches Warte- und Fertig-Feedback:
+//   banner('läuft…','laeuft')  → grosses Banner oben, bleibt stehen
+//   banner('✓ erledigt','ok')  → grün, verschwindet nach ein paar Sekunden
+// mitLader() verbindet beides mit dem Knopf (Spinner, gesperrt) – man sieht
+// IMMER, dass etwas läuft, und bekommt IMMER ein sichtbares «fertig».
+// ---------------------------------------------------------------------------
+
+let bannerTimer = null
+function banner (text, art = 'laeuft') {
+  let b = document.getElementById('bannerFeedback')
+  if (!b) {
+    b = el('div')
+    b.id = 'bannerFeedback'
+    document.body.appendChild(b)
+  }
+  b.className = 'banner ' + art
+  b.textContent = text
+  b.hidden = false
+  clearTimeout(bannerTimer)
+  if (art === 'ok') bannerTimer = setTimeout(() => { b.hidden = true }, 3500)
+  if (art === 'fehler') bannerTimer = setTimeout(() => { b.hidden = true }, 8000)
+}
+function bannerWeg () {
+  clearTimeout(bannerTimer)
+  const b = document.getElementById('bannerFeedback')
+  if (b) b.hidden = true
+}
+
+async function mitLader (knopf, textWaehrend, aufgabe, fertigText) {
   if (!knopf || knopf.classList.contains('laedt')) return
   const vorherText = knopf.textContent
   knopf.classList.add('laedt')
   knopf.disabled = true
-  if (textWaehrend) knopf.textContent = textWaehrend
+  if (textWaehrend) {
+    knopf.textContent = textWaehrend
+    banner(textWaehrend, 'laeuft')
+  }
   try {
-    return await aufgabe()
+    const ergebnis = await aufgabe()
+    if (fertigText) banner('✓ ' + fertigText, 'ok')
+    else bannerWeg()
+    return ergebnis
+  } catch (e) {
+    banner('✗ ' + (e?.message || 'Fehlgeschlagen'), 'fehler')
+    throw e
   } finally {
     knopf.classList.remove('laedt')
     knopf.disabled = false
@@ -515,6 +553,7 @@ function auswahlSpeichern (name, feld, wert) {
 // ---------------------------------------------------------------------------
 
 async function zipHochladen (datei) {
+  banner(`«${datei.name}» wird importiert und analysiert …`, 'laeuft')
   status(`Importiere ${datei.name} (${groesse(datei.size)}) …`)
   try {
     const antwort = await fetch('/api/import', {
@@ -528,12 +567,15 @@ async function zipHochladen (datei) {
     const daten = await antwort.json()
     if (!antwort.ok) throw new Error(daten.fehler || 'Import fehlgeschlagen.')
     await projekteLaden(daten.id)
+    banner(`✓ Import fertig: ${daten.name} ist bereit – Befunde und Vorschau sind geladen.`, 'ok')
   } catch (e) {
     status('Import fehlgeschlagen: ' + e.message, 'err')
+    banner('✗ Import fehlgeschlagen: ' + e.message, 'fehler')
   }
 }
 
 async function pfadImportieren (pfad) {
+  banner('ZIP wird importiert und analysiert …', 'laeuft')
   status('Lese ' + pfad + ' …')
   try {
     const antwort = await fetch('/api/import-pfad', {
@@ -545,8 +587,10 @@ async function pfadImportieren (pfad) {
     if (!antwort.ok) throw new Error(daten.fehler || 'Import fehlgeschlagen.')
     $('#pfad').value = ''
     await projekteLaden(daten.id)
+    banner(`✓ Import fertig: ${daten.name} ist bereit – Befunde und Vorschau sind geladen.`, 'ok')
   } catch (e) {
     status('Import fehlgeschlagen: ' + e.message, 'err')
+    banner('✗ Import fehlgeschlagen: ' + e.message, 'fehler')
   }
 }
 
@@ -625,7 +669,7 @@ $('#btnZip').onclick = () => {
   location.href = `/api/projekte/${encodeURIComponent(aktuell.id)}/zip`
 }
 
-$('#btnAnalyse').onclick = () => mitLader($('#btnAnalyse'), 'Prüfe …', async () => {
+$('#btnAnalyse').onclick = () => mitLader($('#btnAnalyse'), 'Analyse läuft …', async () => {
   if (!aktuell) return
   status('Prüfe erneut …')
   const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/analyse`, { method: 'POST' })
@@ -1444,7 +1488,7 @@ $('#btnSichern').onclick = () => {
   if (!aktuell) return status('Zuerst ein Projekt laden.', 'err')
   jetztSichern($('#standName').value.trim() || 'Stand gesichert')
 }
-$('#btnJetztSichern').onclick = () => mitLader($('#btnJetztSichern'), 'Sichere …', () => jetztSichern('Änderungen von aussen'))
+$('#btnJetztSichern').onclick = () => mitLader($('#btnJetztSichern'), 'Sichere …', () => jetztSichern('Änderungen von aussen'), 'Gesichert – im Verlauf abgelegt.')
 $('#standName').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnSichern').click() })
 $('#standDatum').onchange = (e) => { tagFilter = e.target.value; verlaufZeichnen() }
 $('#btnDatumWeg').onclick = () => { tagFilter = ''; $('#standDatum').value = ''; verlaufZeichnen() }
@@ -1593,7 +1637,7 @@ function quelleOderBuild (build) {
   vorschauBauen()
 }
 
-$('#btnBuildErzeugen').onclick = () => mitLader($('#btnBuildErzeugen'), 'Baue & optimiere …', buildErstellen)
+$('#btnBuildErzeugen').onclick = () => mitLader($('#btnBuildErzeugen'), 'Build läuft – bitte warten …', buildErstellen, 'Build fertig. Du kannst weitermachen.')
 $('#btnBuildAnsehen').onclick = () => {
   document.querySelector('.reiter button[data-reiter="vorschau"]').click()
   quelleOderBuild(true)
@@ -2088,6 +2132,8 @@ $('#btnPruefung').onclick = async () => {
   if (!aktuell) return status('Zuerst ein Projekt öffnen.', 'err')
   const knopf = $('#btnPruefung')
   knopf.disabled = true
+  knopf.classList.add('laedt')
+  banner('KI-Endprüfung läuft – mechanische Prüfung, dann zwei KI-Durchgänge …', 'laeuft')
   $('#pruefStatus').textContent = 'Prüfung startet …'
   try {
     const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/endpruefung`, {
@@ -2114,16 +2160,22 @@ $('#btnPruefung').onclick = async () => {
         else if (art === 'fehler') fehler = daten.text
       }
     }
-    if (fehler) { $('#pruefStatus').textContent = fehler; status(fehler, 'err') }
+    if (fehler) { $('#pruefStatus').textContent = fehler; status(fehler, 'err'); banner('✗ ' + fehler, 'fehler') }
     else if (bericht) {
       pruefungZeichnen(bericht)
+      const st = bericht.statistik
+      banner(st.kritisch === 0
+        ? `✓ Endprüfung abgeschlossen: keine kritischen Funde (${st.warnung} Warnungen). Du kannst weitermachen.`
+        : `Endprüfung abgeschlossen: ${st.kritisch} kritische(r) Fund(e) – unten anschauen.`, st.kritisch === 0 ? 'ok' : 'fehler')
       status('Endprüfung abgeschlossen.', 'ok')
       fortschrittLaden()
     }
   } catch (e) {
     $('#pruefStatus').textContent = 'Prüfung fehlgeschlagen: ' + e.message
+    banner('✗ Prüfung fehlgeschlagen: ' + e.message, 'fehler')
   } finally {
     knopf.disabled = false
+    knopf.classList.remove('laedt')
   }
 }
 
@@ -2679,6 +2731,7 @@ function vergleichZeigen (m) {
       const d = await antwort.json()
       if (!antwort.ok) throw new Error(d.fehler)
       overlay.remove()
+      banner(`✓ ${d.uebernommen.length} Datei(en) übernommen – im Verlauf gesichert. Weiter mit Build → Staging.`, 'ok')
       status(`${d.uebernommen.length} Datei(en) übernommen – als Stand im Verlauf gesichert.`, 'ok')
       vergleichStand(`✓ ${d.uebernommen.length} Datei(en) übernommen und im Verlauf gesichert. `
         + 'Nächster Schritt: Build erzeugen → Auf Staging stellen.')
@@ -2717,11 +2770,13 @@ $('#btnStaging').onclick = async () => {
   const knopf = $('#btnStaging')
   knopf.disabled = true
   knopf.textContent = 'Wird übertragen …'
+  banner('Baue frisch und stelle auf Staging – dauert ~20 Sekunden …', 'laeuft')
   try {
     const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/deploy/staging`, { method: 'POST' })
     const d = await antwort.json()
     if (!antwort.ok) throw new Error(d.fehler)
     status(`Staging aktualisiert – ${d.uebertragen} Datei(en) übertragen. ` + (d.url ? d.url : ''), 'ok')
+    banner(`✓ Staging aktualisiert (${d.uebertragen} Datei(en)). Jetzt «Staging öffnen» und prüfen.`, 'ok')
   } catch (e) {
     status('Staging-Deploy fehlgeschlagen: ' + e.message, 'err')
   } finally {
