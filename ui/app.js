@@ -136,6 +136,7 @@ async function projektOeffnen (id) {
   else if (document.querySelector('[data-panel="start"]').classList.contains('aktiv')) fortschrittLaden()
   aktuelleSeite = null
   seitenZeichnen()
+  buildNamenLaden()
   befundeZeichnen()
   strukturZeichnen()
   chatLeeren()
@@ -170,6 +171,12 @@ function seitenZeichnen () {
   const box = $('#seitenliste')
   box.innerHTML = ''
   const seiten = aktuell?.analyse?.seiten || []
+  // Ohne gewählte Seite die erste öffnen (index.html steht vorn) – so zeigt
+  // die Vorschau auch bei Projekten OHNE index.html sofort etwas.
+  if (!aktuelleSeite && seiten.length) {
+    const erste = [...seiten].sort((a, b) => (a.rel === 'index.html' ? -1 : b.rel === 'index.html' ? 1 : a.rel.localeCompare(b.rel)))[0]
+    setTimeout(() => seiteOeffnen(erste.rel), 0)
+  }
   $('#seitenzahl').textContent = seiten.length ? `(${seiten.length})` : ''
 
   // index.html zuerst, danach alphabetisch, Unterordner nach hinten.
@@ -228,8 +235,23 @@ function seitenZeichnen () {
 // Vorschau
 // ---------------------------------------------------------------------------
 
+// Der Build benennt Dateien um (Kleinschreibung, Umlaute) – diese Karte
+// übersetzt Quellnamen in Buildnamen, damit Seitenklicks in der
+// Build-Ansicht nicht ins Leere zeigen.
+let buildNamen = new Map()
+
+async function buildNamenLaden () {
+  buildNamen = new Map()
+  if (!aktuell) return
+  try {
+    const b = await (await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/build`)).json()
+    for (const u of b?.umbenannt || []) buildNamen.set(u.alt, u.neu)
+  } catch { /* noch kein Build */ }
+}
+
 function seitenUrl (rel) {
-  const pfad = rel.split('/').map(encodeURIComponent).join('/')
+  const echt = zeigeBuild ? (buildNamen.get(rel) || rel) : rel
+  const pfad = echt.split('/').map(encodeURIComponent).join('/')
   const praefix = zeigeBuild ? '__build__/' : ''
   return `${VORSCHAU}/${encodeURIComponent(aktuell.id)}/${praefix}${pfad}`
 }
@@ -1632,8 +1654,8 @@ function quelleOderBuild (build) {
   zeigeBuild = build
   $('#btnQuelle').classList.toggle('primary', !build)
   $('#btnBuild').classList.toggle('primary', build)
-  // Beim Build ist die Startseite immer index.html (kleingeschrieben).
-  if (build) aktuelleSeite = 'index.html'
+  // Gewählte Seite behalten – die Namens-Karte übersetzt in den Buildnamen.
+  if (build && !aktuelleSeite) aktuelleSeite = 'index.html'
   vorschauBauen()
 }
 

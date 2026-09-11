@@ -1701,7 +1701,11 @@ vorschau.use(async (req, res, next) => {
   if (teile[1] === '__build__') {
     if (teile.some(t => t === '..' || t.toLowerCase() === '.git')) return res.status(404).end()
     req.url = '/' + teile.slice(2).map(encodeURIComponent).join('/') + (abfrage ? '?' + abfrage : '')
-    return buildAusliefererFuer(id)(req, res, next)
+    try {
+      return buildAusliefererFuer(id)(req, res, next)
+    } catch {
+      return res.status(404).end()
+    }
   }
 
   // Der Verlauf (.git) ist die Buchhaltung von VinWeb, nie Teil der Website.
@@ -1744,7 +1748,13 @@ vorschau.use(async (req, res, next) => {
 
   const rest = '/' + teile.slice(1).map(encodeURIComponent).join('/')
   req.url = rest + (abfrage ? '?' + abfrage : '')
-  ausliefererFuer(id)(req, res, next)
+  // Ungültige Kennungen (z. B. der automatische /favicon.ico-Abruf des
+  // Browsers) sind hier normal – sie bekommen 404, niemals einen Absturz.
+  try {
+    ausliefererFuer(id)(req, res, next)
+  } catch {
+    res.status(404).end()
+  }
 })
 
 vorschau.use((req, res) => {
@@ -1757,6 +1767,16 @@ vorschau.use((req, res) => {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
+
+// Absturznetz: Ein lokales Werkzeug soll einen unerwarteten Fehler MELDEN,
+// aber nicht sterben – sonst steht ohne Vorwarnung alles still (und der
+// --watch-Neustart hängt am noch belegten Port fest).
+process.on('unhandledRejection', (e) => {
+  console.error('[VinWeb] Unbehandelter Fehler (weitergelaufen):', e?.stack || e)
+})
+process.on('uncaughtException', (e) => {
+  console.error('[VinWeb] Unerwarteter Fehler (weitergelaufen):', e?.stack || e)
+})
 
 await fs.mkdir(PROJECTS_DIR, { recursive: true })
 
