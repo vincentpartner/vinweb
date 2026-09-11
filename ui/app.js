@@ -2763,6 +2763,69 @@ function stagingKnoepfeZeigen () {
   $('#btnStaging').hidden = !hat
   $('#btnStagingOeffnen').hidden = !(hat && d.stagingUrl)
   if (d?.stagingUrl) $('#btnStagingOeffnen').href = d.stagingUrl
+  $('#btnZielAendern').hidden = !hat
+  // Ohne Ziel: Einrichtungs-Formular zeigen, Zugang vom letzten Projekt vorschlagen.
+  $('#zielFormular').hidden = hat
+  if (!hat && aktuell) zielFormularFuellen()
+}
+
+async function zielFormularFuellen () {
+  const d = aktuell?.deploy || {}
+  $('#zielHost').value = d.host || ''
+  $('#zielPfad').value = d.staging || ''
+  $('#zielUrl').value = d.stagingUrl || ''
+  if (!$('#zielHost').value) {
+    try {
+      const v = await (await fetch('/api/deploy-vorschlag')).json()
+      if (v.host) $('#zielHost').value = v.host
+    } catch { /* dann eben leer */ }
+  }
+}
+
+function zielStand (text, art) {
+  const z = $('#zielStand')
+  z.hidden = false
+  z.className = 'karten-stand' + (art ? ' ' + art : '')
+  z.textContent = text
+}
+
+$('#btnZielAendern').onclick = () => {
+  const f = $('#zielFormular')
+  f.hidden = !f.hidden
+  if (!f.hidden) zielFormularFuellen()
+}
+
+$('#btnZielSpeichern').onclick = async () => {
+  if (!aktuell) return
+  const knopf = $('#btnZielSpeichern')
+  knopf.disabled = true
+  zielStand('Speichere und teste die Verbindung …', 'laeuft')
+  try {
+    const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/deploy-ziel`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        host: $('#zielHost').value.trim(),
+        staging: $('#zielPfad').value.trim(),
+        stagingUrl: $('#zielUrl').value.trim(),
+      }),
+    })
+    const d = await antwort.json()
+    if (!antwort.ok) throw new Error(d.fehler)
+    aktuell.deploy = d.deploy
+
+    const test = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/deploy-test`, { method: 'POST' })
+    const t = await test.json()
+    if (!test.ok) throw new Error(t.fehler)
+
+    zielStand('✓ Verbindung steht, Zielordner ist bereit. Jetzt «Auf Testserver stellen».')
+    stagingKnoepfeZeigen()
+    $('#zielFormular').hidden = false   // Bestätigung sichtbar lassen
+  } catch (e) {
+    zielStand(e.message, 'fehler')
+  } finally {
+    knopf.disabled = false
+  }
 }
 
 $('#btnStaging').onclick = async () => {

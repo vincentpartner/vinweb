@@ -22,7 +22,7 @@ import { ernten, ERNTE_DIR } from './lib/ernte.js'
 import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren } from './lib/seo.js'
 import { fortschrittBerechnen, SCHRITTE } from './lib/fortschritt.js'
 import { endpruefungLaufen } from './lib/endpruefung.js'
-import { deployAusfuehren, stagingSchutzEinbetten } from './lib/deploy.js'
+import { deployAusfuehren, stagingSchutzEinbetten, hostGueltig, pfadGueltig } from './lib/deploy.js'
 import { GEHEIM_DATEINAME } from './lib/geheim.js'
 import { execFile } from 'node:child_process'
 import { schluesselSetzen, schluesselUebersicht, schluesselHolen } from './lib/keys.js'
@@ -77,7 +77,13 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '60mb' }))
 
-app.use(express.static(path.join(ROOT, 'ui')))
+// Oberfläche nie cachen: Nach jedem VinWeb-Update genügt normales Neuladen –
+// kein «warum sehe ich die neue Funktion nicht»-Rätsel mehr.
+app.use(express.static(path.join(ROOT, 'ui'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-store'),
+}))
 
 // Alle Projekte auflisten
 app.get('/api/projekte', async (req, res) => {
@@ -828,6 +834,69 @@ app.put('/api/projekte/:id/fortschritt', async (req, res) => {
     res.json(await fortschrittBerechnen(projekt))
   } catch (e) {
     res.status(500).json({ fehler: e.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
+// Deploy-Ziel einrichten – damit neue Projekte OHNE Handarbeit ans Netz kommen
+// ---------------------------------------------------------------------------
+
+// Vorschlag für neue Projekte: der Host des zuletzt eingerichteten Projekts.
+app.get('/api/deploy-vorschlag', async (req, res) => {
+  for (const p of await projekteAuflisten()) {
+    if (p.deploy?.host) return res.json({ host: p.deploy.host })
+  }
+  res.json({ host: '' })
+})
+
+app.put('/api/projekte/:id/deploy-ziel', async (req, res) => {
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    const { host, staging, stagingUrl } = req.body || {}
+    if (!hostGueltig(host)) {
+      return res.status(400).json({ fehler: 'Zugang bitte als benutzer@server angeben, z. B. zojegozo@s130.cyon.net.' })
+    }
+    if (!pfadGueltig(staging)) {
+      return res.status(400).json({ fehler: 'Server-Ordner bitte relativ angeben, z. B. public_html/mein-projekt – ohne führenden Schrägstrich, ohne «..».' })
+    }
+    let url = String(stagingUrl || '').trim()
+    if (url && !/^https?:[/][/][a-z0-9.-]+/i.test(url)) {
+      return res.status(400).json({ fehler: 'Die Adresse muss mit http:// oder https:// beginnen.' })
+    }
+    projekt.deploy = {
+      ...(projekt.deploy || {}),
+      host: String(host).trim(),
+      staging: String(staging).trim().replace(/[/]+$/, ''),
+      stagingUrl: url.replace(/[/]+$/, ''),
+    }
+    await projektSchreiben(req.params.id, projekt)
+    res.json({ ok: true, deploy: projekt.deploy })
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+})
+
+// Prüft die Verbindung und legt den Zielordner gleich an (mkdir -p ist
+// wiederholbar und harmlos). BatchMode: niemals nach Passwörtern fragen.
+app.post('/api/projekte/:id/deploy-test', async (req, res) => {
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt?.deploy?.host || !projekt?.deploy?.staging) {
+      return res.status(400).json({ fehler: 'Zuerst Zugang und Server-Ordner speichern.' })
+    }
+    const { execFile } = await import('node:child_process')
+    const { promisify } = await import('node:util')
+    const lauf = promisify(execFile)
+    await lauf('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', projekt.deploy.host,
+      'mkdir -p ' + projekt.deploy.staging.replace(/[^a-zA-Z0-9._/-]/g, '') + ' && echo VINWEB_OK'],
+      { timeout: 20000 })
+    res.json({ ok: true })
+  } catch (e) {
+    const text = /Permission denied|publickey/i.test(String(e.stderr || e.message))
+      ? 'Der Server kennt deinen SSH-Schlüssel nicht. Einmalig nötig: den öffentlichen Schlüssel bei diesem Hosting hinterlegen.'
+      : 'Verbindung fehlgeschlagen: ' + (e.stderr || e.message).toString().slice(0, 200)
+    res.status(502).json({ fehler: text })
   }
 })
 

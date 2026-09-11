@@ -261,6 +261,26 @@
           <button class="btn klein" id="btnBuildAnsehen" hidden title="Zeigt die fertige Fassung in der Vorschau &ndash; genau so, wie sie ins Netz geht">Ergebnis ansehen</button>
           <button class="btn klein primary" id="btnStaging" hidden title="Baut frisch und stellt die Website auf deine Test-Adresse im Netz. F&uuml;r Google unsichtbar. Dauert ~20 Sekunden.">Auf Testserver stellen</button>
           <a class="btn klein" id="btnStagingOeffnen" hidden target="_blank" rel="noopener" style="text-decoration:none;display:inline-block" title="Deine Test-Adresse im Browser &ouml;ffnen">Testserver &ouml;ffnen</a>
+          <button class="btn klein" id="btnZielAendern" hidden title="Server-Ziel dieses Projekts anzeigen und &auml;ndern">Ziel &auml;ndern</button>
+        </div>
+        <div class="karte" id="zielFormular" hidden style="margin:14px 18px 0;max-width:640px">
+          <h4>Server-Ziel einrichten</h4>
+          <div class="karten-inhalt">
+            <p class="karten-hinweis" style="margin-top:0">Einmal pro Projekt: Wohin soll die Website gestellt werden?
+              Voraussetzung: dein SSH-Schl&uuml;ssel ist bei diesem Hosting hinterlegt (bei deinem
+              Cyon-Konto bereits geschehen). Subdomain samt Zielordner legst du vorher in my.cyon
+              an &ndash; den Ordnernamen hier exakt gleich eintragen.</p>
+            <label class="ziel-label">Zugang (benutzer@server)</label>
+            <input type="text" id="zielHost" placeholder="zojegozo@s130.cyon.net">
+            <label class="ziel-label">Server-Ordner (relativ, wie in my.cyon als Zielordner angegeben)</label>
+            <input type="text" id="zielPfad" placeholder="public_html/mein-projekt">
+            <label class="ziel-label">Adresse im Netz (f&uuml;r den Knopf «Testserver &ouml;ffnen»)</label>
+            <input type="text" id="zielUrl" placeholder="https://mein-projekt.zojegozo.cyon.site">
+            <div class="l-knoepfe" style="margin-top:12px">
+              <button class="btn klein primary" id="btnZielSpeichern">Speichern &amp; Verbindung testen</button>
+            </div>
+            <div id="zielStand" class="karten-stand" hidden></div>
+          </div>
         </div>
         <div class="befunde" id="buildBericht">
           <div class="tab-info">
