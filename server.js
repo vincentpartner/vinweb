@@ -1780,22 +1780,36 @@ process.on('uncaughtException', (e) => {
 
 await fs.mkdir(PROJECTS_DIR, { recursive: true })
 
-function startFehler (port) {
-  return (e) => {
-    if (e.code === 'EADDRINUSE') {
-      console.error('')
-      console.error(`  Port ${port} ist schon belegt.`)
-      console.error('  Vermutlich läuft VinWeb bereits in einem anderen Fenster.')
-      console.error(`  Beenden mit:  lsof -ti tcp:${port} | xargs kill`)
-      console.error('')
-    } else {
-      console.error('  Start fehlgeschlagen:', e.message)
-    }
-    process.exit(1)
+// Start mit Wiederholung: Beim --watch-Neustart gibt der alte Prozess den
+// Port oft erst nach einem Moment frei. Frueher: sofort aufgeben -> die
+// Ueberwachung wartete ewig und VinWeb war "einfach weg". Jetzt: bis zu
+// 15 Sekunden lang erneut versuchen, erst dann wirklich aufgeben.
+function lauschenMitWiederholung (anwendung, port, dann) {
+  let versuche = 0
+  const versuch = () => {
+    const server = anwendung.listen(port, HOST, () => dann?.(server))
+    server.on('error', (e) => {
+      if (e.code === 'EADDRINUSE' && versuche < 30) {
+        versuche++
+        if (versuche === 1) console.error(`  Port ${port} noch belegt – versuche es weiter …`)
+        setTimeout(versuch, 500)
+      } else if (e.code === 'EADDRINUSE') {
+        console.error('')
+        console.error(`  Port ${port} bleibt belegt.`)
+        console.error('  Vermutlich läuft VinWeb bereits in einem anderen Fenster.')
+        console.error(`  Beenden mit:  lsof -ti tcp:${port} | xargs kill`)
+        console.error('')
+        process.exit(1)
+      } else {
+        console.error('  Start fehlgeschlagen:', e.message)
+        process.exit(1)
+      }
+    })
   }
+  versuch()
 }
 
-const uiServer = app.listen(UI_PORT, HOST, () => {
+lauschenMitWiederholung(app, UI_PORT, () => {
   console.log('')
   console.log('  VinWeb läuft.')
   console.log('')
@@ -1805,7 +1819,4 @@ const uiServer = app.listen(UI_PORT, HOST, () => {
   console.log('  Beenden mit  Ctrl + C')
   console.log('')
 })
-
-const vorschauServer = vorschau.listen(PREVIEW_PORT, HOST)
-uiServer.on('error', startFehler(UI_PORT))
-vorschauServer.on('error', startFehler(PREVIEW_PORT))
+lauschenMitWiederholung(vorschau, PREVIEW_PORT)
