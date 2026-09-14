@@ -23,6 +23,7 @@ import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren } f
 import { fortschrittBerechnen, SCHRITTE } from './lib/fortschritt.js'
 import { endpruefungLaufen } from './lib/endpruefung.js'
 import { deployAusfuehren, stagingSchutzEinbetten, hostGueltig, pfadGueltig } from './lib/deploy.js'
+import { geheimnisImInhalt } from './lib/geheim.js'
 import { GEHEIM_DATEINAME } from './lib/geheim.js'
 import { execFile } from 'node:child_process'
 import { schluesselSetzen, schluesselUebersicht, schluesselHolen } from './lib/keys.js'
@@ -381,17 +382,63 @@ app.post('/api/chat', async (req, res) => {
       const geliefert = []
       const verweigert = []
       const teile = []
+
+      // KI-Modelle raten gern generische Namen («index.html», «styles.css»).
+      // Statt stur abzulehnen, lösen wir tolerant auf: exakter Name ->
+      // Gross-/Kleinschreibung -> blosser Dateiname -> Startseiten-Alias ->
+      // eindeutiger Teilname. Nur bei EINDEUTIGEM Treffer wird geliefert.
+      // Nur Seiten anbieten, die WIRKLICH auf der Platte liegen – die Analyse
+      // kann veraltet sein (Geistereinträge nach Zurücksetzen o. Ä.).
+      const seitenListe = []
+      for (const x of projekt.analyse?.seiten || []) {
+        const pruef = pfadPruefen(wurzelChat, x.rel)
+        if (!pruef) continue
+        try { await fs.access(pruef.voll); seitenListe.push(x.rel) } catch { /* Geist */ }
+      }
+      const aufloesen = async (rel) => {
+        const direkt = pfadPruefen(wurzelChat, rel)
+        if (direkt) {
+          try { await fs.access(direkt.voll); return direkt.rel } catch { /* weiter suchen */ }
+        }
+        const klein = rel.toLowerCase()
+        const genauCI = seitenListe.find(f => f.toLowerCase() === klein)
+        if (genauCI) return genauCI
+        const basis = klein.split('/').pop()
+        const gleicherName = seitenListe.filter(f => f.toLowerCase().split('/').pop() === basis)
+        if (gleicherName.length === 1) return gleicherName[0]
+        if (/^(index|start(seite)?|home)(\.html?)?$/.test(basis)) {
+          const start = seitenListe.filter(f => /index|start|home/i.test(f))
+          if (start.length === 1) return start[0]
+          if (seitenListe.length === 1) return seitenListe[0]
+          if (start.length > 1) return start.sort()[0]
+        }
+        const stamm = basis.replace(/\.[a-z0-9.]+$/, '')
+        if (stamm.length >= 4) {
+          const teiltreffer = seitenListe.filter(f => f.toLowerCase().includes(stamm))
+          if (teiltreffer.length === 1) return teiltreffer[0]
+        }
+        return null
+      }
+
       for (const rel of gewuenscht) {
-        const ziel = pfadPruefen(wurzelChat, rel)
-        if (!ziel || GEHEIM_NAME.test(ziel.rel)) { verweigert.push(rel); continue }
+        const echt = await aufloesen(rel)
+        const ziel = echt ? pfadPruefen(wurzelChat, echt) : null
+        if (!ziel || GEHEIM_NAME.test(ziel.rel)) { verweigert.push(rel + (echt ? '' : ' (nicht gefunden)')); continue }
         try {
           const inhalt = await fs.readFile(ziel.voll, 'utf8')
           if (inhalt.length > 300 * 1024) { verweigert.push(rel + ' (zu gross)'); continue }
           const fund = geheimnisImInhalt(inhalt)
           if (fund) { verweigert.push(rel + ' (enthält ' + fund + ')'); continue }
-          teile.push(`--- AKTUELLER INHALT VON ${ziel.rel} ---\n${inhalt}`)
+          const kopfzeile = ziel.rel === rel
+            ? `--- AKTUELLER INHALT VON ${ziel.rel} ---`
+            : `--- AKTUELLER INHALT VON ${ziel.rel} (angefordert als «${rel}» – die Datei heisst wirklich so; verwende künftig diesen Namen) ---`
+          teile.push(`${kopfzeile}\n${inhalt}`)
           geliefert.push(ziel.rel)
         } catch { verweigert.push(rel + ' (nicht gefunden)') }
+      }
+      // Bei Absagen der KI sagen, was es WIRKLICH gibt – sonst rät sie weiter.
+      if (verweigert.some(v => v.includes('nicht gefunden')) && seitenListe.length) {
+        teile.push('HINWEIS: Diese Seiten existieren im Projekt: ' + seitenListe.slice(0, 25).join(', '))
       }
       if (!geliefert.length) {
         // Angefordert, aber nichts lieferbar – das dem Nutzer klar sagen,
