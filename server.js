@@ -350,6 +350,43 @@ app.post('/api/chat', async (req, res) => {
     const verbrauchSumme = { ein: 0, aus: 0 }
     let verbrauchDa = false
 
+      // KI-Modelle raten gern generische Namen («index.html», «styles.css»).
+    // Statt stur abzulehnen, lösen wir tolerant auf: exakter Name ->
+    // Gross-/Kleinschreibung -> blosser Dateiname -> Startseiten-Alias ->
+    // eindeutiger Teilname. Nur bei EINDEUTIGEM Treffer wird geliefert.
+    // Nur Seiten anbieten, die WIRKLICH auf der Platte liegen – die Analyse
+    // kann veraltet sein (Geistereinträge nach Zurücksetzen o. Ä.).
+    const seitenListe = []
+    for (const x of projekt.analyse?.seiten || []) {
+      const pruef = pfadPruefen(wurzelChat, x.rel)
+      if (!pruef) continue
+      try { await fs.access(pruef.voll); seitenListe.push(x.rel) } catch { /* Geist */ }
+    }
+    const aufloesen = async (rel) => {
+      const direkt = pfadPruefen(wurzelChat, rel)
+      if (direkt) {
+        try { await fs.access(direkt.voll); return direkt.rel } catch { /* weiter suchen */ }
+      }
+      const klein = rel.toLowerCase()
+      const genauCI = seitenListe.find(f => f.toLowerCase() === klein)
+      if (genauCI) return genauCI
+      const basis = klein.split('/').pop()
+      const gleicherName = seitenListe.filter(f => f.toLowerCase().split('/').pop() === basis)
+      if (gleicherName.length === 1) return gleicherName[0]
+      if (/^(index|start(seite)?|home)(\.html?)?$/.test(basis)) {
+        const start = seitenListe.filter(f => /index|start|home/i.test(f))
+        if (start.length === 1) return start[0]
+        if (seitenListe.length === 1) return seitenListe[0]
+        if (start.length > 1) return start.sort()[0]
+      }
+      const stamm = basis.replace(/\.[a-z0-9.]+$/, '')
+      if (stamm.length >= 4) {
+        const teiltreffer = seitenListe.filter(f => f.toLowerCase().includes(stamm))
+        if (teiltreffer.length === 1) return teiltreffer[0]
+      }
+      return null
+    }
+
     for (let runde = 1; runde <= 2; runde++) {
       const r = await chatStreamen({
         anbieter, modell, system,
@@ -383,42 +420,6 @@ app.post('/api/chat', async (req, res) => {
       const verweigert = []
       const teile = []
 
-      // KI-Modelle raten gern generische Namen («index.html», «styles.css»).
-      // Statt stur abzulehnen, lösen wir tolerant auf: exakter Name ->
-      // Gross-/Kleinschreibung -> blosser Dateiname -> Startseiten-Alias ->
-      // eindeutiger Teilname. Nur bei EINDEUTIGEM Treffer wird geliefert.
-      // Nur Seiten anbieten, die WIRKLICH auf der Platte liegen – die Analyse
-      // kann veraltet sein (Geistereinträge nach Zurücksetzen o. Ä.).
-      const seitenListe = []
-      for (const x of projekt.analyse?.seiten || []) {
-        const pruef = pfadPruefen(wurzelChat, x.rel)
-        if (!pruef) continue
-        try { await fs.access(pruef.voll); seitenListe.push(x.rel) } catch { /* Geist */ }
-      }
-      const aufloesen = async (rel) => {
-        const direkt = pfadPruefen(wurzelChat, rel)
-        if (direkt) {
-          try { await fs.access(direkt.voll); return direkt.rel } catch { /* weiter suchen */ }
-        }
-        const klein = rel.toLowerCase()
-        const genauCI = seitenListe.find(f => f.toLowerCase() === klein)
-        if (genauCI) return genauCI
-        const basis = klein.split('/').pop()
-        const gleicherName = seitenListe.filter(f => f.toLowerCase().split('/').pop() === basis)
-        if (gleicherName.length === 1) return gleicherName[0]
-        if (/^(index|start(seite)?|home)(\.html?)?$/.test(basis)) {
-          const start = seitenListe.filter(f => /index|start|home/i.test(f))
-          if (start.length === 1) return start[0]
-          if (seitenListe.length === 1) return seitenListe[0]
-          if (start.length > 1) return start.sort()[0]
-        }
-        const stamm = basis.replace(/\.[a-z0-9.]+$/, '')
-        if (stamm.length >= 4) {
-          const teiltreffer = seitenListe.filter(f => f.toLowerCase().includes(stamm))
-          if (teiltreffer.length === 1) return teiltreffer[0]
-        }
-        return null
-      }
 
       for (const rel of gewuenscht) {
         const echt = await aufloesen(rel)
@@ -468,6 +469,21 @@ app.post('/api/chat', async (req, res) => {
     const verbrauch = verbrauchDa ? verbrauchSumme : null
     // Eine übrig gebliebene Anforderungs-Zeile gehört nicht in die Anzeige.
     const zerlegt = antwortZerlegen(text.replace(BRAUCHE, '').trim())
+
+    // KI-Namensfehler abfangen: Gibt die KI eine Datei unter erratenem Namen
+    // zurück (z. B. «startseite.html» statt «Bewida Startseite.dc.html»),
+    // entstünde beim Übernehmen ein DUPLIKAT statt einer Änderung. Zeigt der
+    // Pfad ins Leere und die tolerante Auflösung findet eindeutig die
+    // gemeinte Datei, biegen wir den Vorschlag auf den echten Namen um.
+    for (const d of zerlegt.dateien) {
+      const ziel = pfadPruefen(wurzelChat, d.pfad)
+      let existiert = false
+      if (ziel) { try { await fs.access(ziel.voll); existiert = true } catch { /* neu */ } }
+      if (!existiert) {
+        const echt = await aufloesen(d.pfad)
+        if (echt && echt !== d.pfad) d.pfad = echt
+      }
+    }
     const aenderungen = zerlegt.dateien.length
       ? await vorschlaegePruefen(projektId, zerlegt.dateien)
       : []
