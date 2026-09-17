@@ -1,4 +1,4 @@
-# VinWeb
+# Sitepilot
 
 Lokale Oberfläche, um einen Website-Export (ZIP aus Claude Design) zu importieren,
 zu prüfen, anzupassen und später über GitHub zu veröffentlichen.
@@ -23,7 +23,7 @@ lib/config.js      Ports und Pfade
 lib/projects.js    Projekte anlegen, auflisten, lesen
 lib/importer.js    ZIP entpacken (mit Schutz gegen präparierte Archive)
 lib/analyze.js     Prüfbericht: was fehlt noch bis zum Livegang
-lib/keys.js        API-Schlüssel (liegen in ~/.vinweb/keys.json, nicht im Projekt)
+lib/keys.js        API-Schlüssel (liegen in ~/.sitepilot/keys.json, nicht im Projekt)
 lib/ai.js          Anbindung an Claude und ChatGPT
 lib/aenderungen.js Vorschläge zerlegen, Unterschiede zeigen, schreiben
 lib/git.js         Verlauf: Stände sichern, ansehen, zurückholen
@@ -57,9 +57,9 @@ PHP normal.
 
 ## API-Schlüssel
 
-Über das Zahnrad rechts oben im Chat. Die Schlüssel landen in `~/.vinweb/keys.json`
+Über das Zahnrad rechts oben im Chat. Die Schlüssel landen in `~/.sitepilot/keys.json`
 (nur für dich lesbar) — nicht im Projektordner und nicht im Repo. Deshalb kannst du
-VinWeb weitergeben, ohne dass deine Schlüssel mitgehen.
+Sitepilot weitergeben, ohne dass deine Schlüssel mitgehen.
 
 Der Browser bekommt die Schlüssel nie zu sehen: alle KI-Aufrufe laufen über den
 lokalen Server, die Oberfläche zeigt nur eine maskierte Anzeige.
@@ -67,14 +67,14 @@ lokalen Server, die Oberfläche zeigt nur eine maskierte Anzeige.
 ## Verlauf und Zurücksetzen
 
 Jedes Projekt bekommt beim Import ein eigenes Git-Repo in `source/`. Gesichert wird
-automatisch vor und nach jeder VinWeb-Aktion, dazu über den Knopf «Stand jetzt sichern»
+automatisch vor und nach jeder Sitepilot-Aktion, dazu über den Knopf «Stand jetzt sichern»
 mit eigenem Namen. Vor jeder Aktion wird ausserdem festgehalten, was sich seit dem
 letzten Mal von aussen geändert hat — Arbeit im Editor oder im eingebauten Bild-Editor
 geht also ebenfalls nicht verloren.
 
-Zusätzlich sichert VinWeb alle 5 Minuten automatisch, sobald sich etwas geändert hat –
+Zusätzlich sichert Sitepilot alle 5 Minuten automatisch, sobald sich etwas geändert hat –
 auch Arbeit von aussen (Editor, Claude Design, Bild-Editor). Den Takt steuert die
-Umgebungsvariable `VINWEB_AUTO_SICHERN_SEKUNDEN` (0 schaltet ihn aus).
+Umgebungsvariable `SITEPILOT_AUTO_SICHERN_SEKUNDEN` (0 schaltet ihn aus).
 
 Im Reiter «Verlauf» siehst du alle Stände nach Tag und Uhrzeit. «Ansehen» zeigt vorher,
 was ein Zurücksetzen bewirken würde. Zurücksetzen geht für das ganze Projekt oder für
@@ -89,7 +89,7 @@ Das Häkchen bedeutet damit wörtlich: gesichert und wiederherstellbar.
 
 ## KI-Chat: automatisches Nachreichen
 
-Fehlt der KI eine Datei, fordert sie sie über eine Protokollzeile an; VinWeb prüft
+Fehlt der KI eine Datei, fordert sie sie über eine Protokollzeile an; Sitepilot prüft
 den Pfad, liefert den Inhalt nach und lässt die Aufgabe im selben Durchgang lösen
 (max. 1 Nachreich-Runde, 6 Dateien à 300 KB). Dateien mit Zugangsdaten werden nie
 übergeben — auch nicht auf direkte Anforderung. Die Kostenzeile summiert alle Runden.
@@ -97,8 +97,8 @@ den Pfad, liefert den Inhalt nach und lässt die Aufgabe im selben Durchgang lö
 ## Klick-Editoren in der Vorschau
 
 Die Projekt-eigenen Editoren (Bild anklicken → hochladen; image-slot, media-edit,
-scroll-shot) funktionieren in der Quell-Vorschau: VinWeb setzt beim Ausliefern eine
-Brücke ein (`window.omelette.writeFile` → `/__vinweb/schreiben`), die ausschliesslich
+scroll-shot) funktionieren in der Quell-Vorschau: Sitepilot setzt beim Ausliefern eine
+Brücke ein (`window.omelette.writeFile` → `/__sitepilot/schreiben`), die ausschliesslich
 `.state.json`-Sidecars am Projektstamm schreiben darf und durch die Projekt-
 Warteschlange läuft. Der Build entfernt zudem Editor-Reste hinter `</html>`.
 
@@ -118,7 +118,7 @@ Produktions-Stand. Kommt vor dem Deploy.
 - Jeder Pfad wird gegen Ausbruch aus dem Projektordner geprüft (Zip-Slip-Schutz).
 - Schreibvorgänge je Projekt laufen über eine Warteschlange nacheinander –
   die automatische Sicherung kann keinen halben Stand festhalten.
-- API-Schlüssel liegen nur in `~/.vinweb/keys.json` (Rechte 600), nie im Browser.
+- API-Schlüssel liegen nur in `~/.sitepilot/keys.json` (Rechte 600), nie im Browser.
 
 ## Produktions-Build (Reiter «Build»)
 
@@ -138,7 +138,7 @@ beiden Ständen um; der Build läuft unter `/<projekt>/__build__/…`.
 
 ## Inhalte ernten (Seitenleiste links)
 
-Adresse einer bestehenden Website eintragen, «Ernten» klicken. VinWeb sammelt die
+Adresse einer bestehenden Website eintragen, «Ernten» klicken. Sitepilot sammelt die
 Texte aller Unterseiten (als Markdown) und lädt alle Bilder in Originalqualität —
 als Rohstoff für den Neubau, nicht als lauffähige Kopie. Ergebnis in `ernte/<domain>-<datum>/`:
 `inhalte.md` (alles in einem), `seiten/` (pro Seite), `bilder/` (Fotos, Screenshots),

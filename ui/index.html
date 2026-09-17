@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VinWeb</title>
+<title>Sitepilot</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -15,7 +15,7 @@
   <aside class="navspalte">
     <div class="ident">
       <span class="dot"></span>
-      <div><b>VinWeb</b><small>Websystem</small></div>
+      <div><b>Sitepilot</b><small>Websystem</small></div>
     </div>
 
     <select id="projektwahl" title="Projekt wechseln"></select>
@@ -34,7 +34,7 @@
       <button data-reiter="vorschau" data-kat="bearbeiten">Vorschau</button>
       <button data-reiter="seo" data-kat="bearbeiten">SEO</button>
       <button data-reiter="bausteine" data-kat="bearbeiten"
-        title="Design-Bausteine f&uuml;r VinWebMidi ernten und freigeben">Bausteine <span class="zahl" id="bausteinzahl" hidden>0</span></button>
+        title="Design-Bausteine f&uuml;r Sitepilot Midi ernten und freigeben">Bausteine <span class="zahl" id="bausteinzahl" hidden>0</span></button>
 
       <div class="m-gruppe">Ver&ouml;ffentlichen</div>
       <button data-reiter="build" data-kat="veroeffentlichen">Build</button>
@@ -97,7 +97,7 @@
             </div>
             <div id="vergleichStand" class="karten-stand" hidden></div>
             <p class="karten-hinweis">H&auml;lt ein frisches Claude-Design-ZIP gegen das <b>offene Projekt</b>:
-              Neues und Ge&auml;ndertes zum Ausw&auml;hlen, Konflikte mit VinWeb-Arbeit werden markiert.
+              Neues und Ge&auml;ndertes zum Ausw&auml;hlen, Konflikte mit Sitepilot-Arbeit werden markiert.
               Kein Neuimport &ndash; der Verlauf bleibt erhalten.</p>
           </div>
         </div>
@@ -174,7 +174,7 @@
           <b>Zwei Schalter pro Eintrag.</b> <b>Repo</b> bedeutet: wird versioniert und gesichert.
           <b>Server</b> bedeutet: wird sp&auml;ter ver&ouml;ffentlicht. Deine Notizen sollen gesichert,
           aber nicht &ouml;ffentlich sein &ndash; Zugangsdaten umgekehrt auf den Server, aber nie ins Repo.
-          VinWeb schl&auml;gt vor, entscheiden tust du.
+          Sitepilot schl&auml;gt vor, entscheiden tust du.
         </div>
         <div class="karte"><table class="tab" id="strukturtab"></table></div>
       </div>
@@ -188,14 +188,14 @@
           l&auml;sst sich ansehen und komplett oder je Datei zur&uuml;ckholen.</div>
 
         <!-- Fernlager: das private GitHub-Repo dieser Website - verbindet
-             VinWeb mit VinWebMini/Midi beim Kunden (gemeinsamer Verlauf). -->
+             Sitepilot mit Sitepilot Mini/Midi beim Kunden (gemeinsamer Verlauf). -->
         <div class="karte" id="fernlagerKarte">
           <h4>Fernlager (GitHub) <span class="z" id="fernStand"></span></h4>
           <div class="karten-inhalt">
             <div id="fernVerbinden" hidden>
               <p class="karten-hinweis" style="margin:0 0 10px">
-                Ein privates GitHub-Repo pro Website verbindet VinWeb mit
-                VinWebMini/Midi beim Kunden: <b>ein gemeinsamer Verlauf</b>, und du
+                Ein privates GitHub-Repo pro Website verbindet Sitepilot mit
+                Sitepilot Mini/Midi beim Kunden: <b>ein gemeinsamer Verlauf</b>, und du
                 kannst jederzeit selbst fixen und hochladen. Das GitHub-Token tr&auml;gst
                 du einmal unter <b>&#9881; (KI-Spalte)</b> ein; das Repo legst du auf
                 github.com an (privat, leer).</p>
@@ -347,12 +347,12 @@
         </div>
       </div>
     </section>
-    <!-- Bausteine (fuer VinWebMidi) -->
+    <!-- Bausteine (fuer Sitepilot Midi) -->
     <section class="panel" data-panel="bausteine">
       <div class="panel-scroll">
         <div class="tab-info">
-          <b>Die Baustein-Bibliothek f&uuml;r VinWebMidi.</b>
-          VinWeb schl&auml;gt aus einer fertigen Seite die grossen Sektionen vor
+          <b>Die Baustein-Bibliothek f&uuml;r Sitepilot Midi.</b>
+          Sitepilot schl&auml;gt aus einer fertigen Seite die grossen Sektionen vor
           (Hero, Galerie, CTA &hellip;). Du pr&uuml;fst die Miniatur, gibst einen
           kundenfreundlichen Namen und gibst frei &ndash; aus genau diesen Bausteinen
           komponiert die KI in Midi sp&auml;ter neue Unterseiten. Sie schreibt nie
@@ -419,7 +419,7 @@
   <form method="dialog" class="dlg">
     <h2>API-Schl&uuml;ssel</h2>
     <p class="dlg-info">
-      Die Schl&uuml;ssel werden in <code id="schluesselPfad">~/.vinweb/keys.json</code> gespeichert,
+      Die Schl&uuml;ssel werden in <code id="schluesselPfad">~/.sitepilot/keys.json</code> gespeichert,
       lesbar nur f&uuml;r dich &ndash; nicht im Projekt und nicht im Repo.
     </p>
     <label>Claude <small>(console.anthropic.com)</small></label>

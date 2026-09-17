@@ -1,4 +1,4 @@
-/* VinWeb - Oberfläche.
+/* Sitepilot - Oberfläche.
    Reines JavaScript ohne Framework: Du sollst jede Zeile lesen und aendern koennen. */
 
 const VORSCHAU = 'http://127.0.0.1:4401'
@@ -344,12 +344,12 @@ function skalieren () {
 const LOESUNGEN = {
   'zugangsdaten': {
     art: 'automatisch',
-    text: 'Nichts zu tun: VinWeb schliesst diese Dateien automatisch von Repo und Build aus. '
+    text: 'Nichts zu tun: Sitepilot schliesst diese Dateien automatisch von Repo und Build aus. '
       + 'Beim Deploy werden sie separat und geschützt auf den Server gelegt.',
   },
   'zugangsdaten-inhalt': {
     art: 'automatisch',
-    text: 'Nichts zu tun: VinWeb hat die Dateien erkannt und hält sie aus Repo und Build heraus. '
+    text: 'Nichts zu tun: Sitepilot hat die Dateien erkannt und hält sie aus Repo und Build heraus. '
       + 'Prüfe nur, ob der Schlüssel wirklich dorthin gehört – sonst Datei löschen.',
   },
   'seo-config': {
@@ -399,7 +399,7 @@ const LOESUNGEN = {
       + '(assets/footer.js)» oder «Füge auf referenzen.html eine Karte für seite-x.html ein». '
       + 'Nicht mehr gebrauchte Seiten stattdessen über die Seitenliste löschen. Soll eine Seite '
       + 'ABSICHTLICH unverlinkt bleiben (interne Doku, Kampagnen-Landing), füge im Quelltext den '
-      + 'Kommentar «vinweb:absichtlich-unverlinkt» ein – dann schweigt dieser Befund.',
+      + 'Kommentar «sitepilot:absichtlich-unverlinkt» ein – dann schweigt dieser Befund.',
   },
   'sprachen': {
     art: 'hinweis',
@@ -408,7 +408,7 @@ const LOESUNGEN = {
   },
   'hreflang-fehlt': {
     art: 'hinweis',
-    text: 'Gehört zur Sprachstufe: Sobald mehrere Sprachen echt gepflegt werden, erzeugt VinWeb '
+    text: 'Gehört zur Sprachstufe: Sobald mehrere Sprachen echt gepflegt werden, erzeugt Sitepilot '
       + 'die hreflang-Verweise automatisch beim Build.',
   },
 }
@@ -780,13 +780,13 @@ $('#btnSchluessel').onclick = async () => {
   $('#keyAnthropic').value = ''
   $('#keyOpenai').value = ''
   $('#keyGithub').value = ''
-  $('#kostenLimit').value = localStorage.getItem('vinweb_kostenlimit') || ''
+  $('#kostenLimit').value = localStorage.getItem('sitepilot_kostenlimit') || ''
   $('#dlgSchluessel').showModal()
 }
 $('#kostenLimit').addEventListener('change', (e) => {
   const wert = parseFloat(e.target.value)
-  if (wert > 0) localStorage.setItem('vinweb_kostenlimit', String(wert))
-  else localStorage.removeItem('vinweb_kostenlimit')
+  if (wert > 0) localStorage.setItem('sitepilot_kostenlimit', String(wert))
+  else localStorage.removeItem('sitepilot_kostenlimit')
 })
 
 $('#btnKeySpeichern').onclick = async () => {
@@ -830,7 +830,8 @@ async function modelleLaden () {
       auswahl.appendChild(new Option(marke + m.name + monat + preis, m.id))
     })
     // Gemerkte Wahl gilt – sonst das neuste Modell (steht zuoberst).
-    const gemerkt = localStorage.getItem('vinweb_modell_' + anbieter)
+    const gemerkt = localStorage.getItem('sitepilot_modell_' + anbieter)
+      || localStorage.getItem('vinweb_modell_' + anbieter)   // Erinnerung aus VinWeb-Zeiten übernehmen
     if (gemerkt && liste.some(m => m.id === gemerkt)) auswahl.value = gemerkt
     else if (liste.length) auswahl.value = liste[0].id
   } catch (e) {
@@ -841,11 +842,11 @@ async function modelleLaden () {
 }
 
 $('#anbieter').onchange = () => {
-  localStorage.setItem('vinweb_anbieter', $('#anbieter').value)
+  localStorage.setItem('sitepilot_anbieter', $('#anbieter').value)
   modelleLaden()
 }
 $('#modell').onchange = () => {
-  localStorage.setItem('vinweb_modell_' + $('#anbieter').value, $('#modell').value)
+  localStorage.setItem('sitepilot_modell_' + $('#anbieter').value, $('#modell').value)
 }
 
 // ---------------------------------------------------------------------------
@@ -1073,7 +1074,7 @@ async function senden () {
   const modellJetzt = $('#modell').value
   const kostenzeile = el('div', 'verbrauch', '…')
   antwortBlock.block.appendChild(kostenzeile)
-  const limit = parseFloat(localStorage.getItem('vinweb_kostenlimit') || '') || 0
+  const limit = parseFloat(localStorage.getItem('sitepilot_kostenlimit') || '') || 0
 
   // Mitlaufende Anzeige: Uhr + Token + Kosten.
   // Die exakten Zahlen kommen je nach Anbieter erst spät – bis dahin wird die
@@ -1124,7 +1125,7 @@ async function senden () {
       if (art === 'text') {
         gesammelt += daten.t
         // Dateiblöcke nicht im Chat ausbreiten – die kommen als Karte.
-        antwortBlock.txt.textContent = gesammelt.split('=== VINWEB-DATEI:')[0]
+        antwortBlock.txt.textContent = gesammelt.split('=== SITEPILOT-DATEI:')[0]
         $('#chatVerlauf').scrollTop = $('#chatVerlauf').scrollHeight
       } else if (art === 'kontextErweitert') {
         // Automatisch nachgereichte Dateien auch anhaken – so bleiben sie
@@ -1171,7 +1172,7 @@ async function senden () {
   } catch (e) {
     antwortBlock.txt.classList.remove('tippt')
     if (e.name === 'AbortError') {
-      antwortBlock.txt.textContent = (gesammelt.split('=== VINWEB-DATEI:')[0] || '')
+      antwortBlock.txt.textContent = (gesammelt.split('=== SITEPILOT-DATEI:')[0] || '')
         + '\n\n[Gestoppt – es wurde nichts geschrieben.]'
       status('Gestoppt.', 'ok')
     } else {
@@ -1280,7 +1281,7 @@ function vorschlagZeichnen (elternBlock, a, bilder) {
 // Start
 // ---------------------------------------------------------------------------
 
-$('#anbieter').value = localStorage.getItem('vinweb_anbieter') || 'anthropic'
+$('#anbieter').value = localStorage.getItem('sitepilot_anbieter') || 'anthropic'
 modelleLaden()
 
 // Projekte erst laden, wenn alles oben definiert ist.
@@ -2120,13 +2121,13 @@ function pruefungsLoesung (fund) {
         + 'Hier ist nichts zu tun.',
     }
   }
-  // Sonderfall 2: Die .htaccess erzeugt VinWeb beim Build selbst.
+  // Sonderfall 2: Die .htaccess erzeugt Sitepilot beim Build selbst.
   if (fund.datei === '.htaccess' && fund.quelle === 'ki') {
     return {
       art: 'hinweis',
-      text: 'Diese Datei wird bei jedem Build von VinWeb neu erzeugt – eine Chat-Änderung würde '
+      text: 'Diese Datei wird bei jedem Build von Sitepilot neu erzeugt – eine Chat-Änderung würde '
         + 'überschrieben. Wirksame Ratenbegrenzung gehört auf Shared Hosting in den PHP-Code '
-        + '(eigener Fund) bzw. in die VinWeb-Vorlage. Das gehört zu VinWeb selbst, nicht zu deiner Website.',
+        + '(eigener Fund) bzw. in die Sitepilot-Vorlage. Das gehört zu Sitepilot selbst, nicht zu deiner Website.',
     }
   }
   // Regelfall: fertiger Chat-Prompt aus dem Fund.
@@ -2203,12 +2204,12 @@ $('#btnPruefung').onclick = async () => {
 
 
 /* ===========================================================================
-   Baustein-Bibliothek (für VinWebMidi, Etappe 2)
+   Baustein-Bibliothek (für Sitepilot Midi, Etappe 2)
    ===========================================================================
-   VinWeb erntet aus fertigen Seiten die grossen Sektionen als Design-
+   Sitepilot erntet aus fertigen Seiten die grossen Sektionen als Design-
    Bausteine. Hier werden sie geprüft, benannt, etikettiert und freigegeben -
    das Ergebnis (bibliothek.json im Projektordner) ist der Baukasten, aus dem
-   VinWebMidi später per KI neue Unterseiten komponiert. */
+   Sitepilot Midi später per KI neue Unterseiten komponiert. */
 
 let bausteinEtiketten = []   // Vokabular vom Server ({wert, name})
 
@@ -2249,7 +2250,7 @@ function bausteinMiniSkalieren (box, hoehe) {
 
 window.addEventListener('message', (e) => {
   if (e.origin !== VORSCHAU) return
-  if (e.data?.typ !== 'vinweb-baustein-masse') return
+  if (e.data?.typ !== 'sitepilot-baustein-masse') return
   for (const box of document.querySelectorAll('.bau-mini')) {
     if (box.dataset.sel === e.data.sel) bausteinMiniSkalieren(box, e.data.hoehe)
   }
@@ -2471,10 +2472,10 @@ function vorschlaegeZeichnen (seite, kandidaten) {
 
 
 /* ===========================================================================
-   Fernlager (GitHub) - Sync mit VinWebMini/Midi beim Kunden
+   Fernlager (GitHub) - Sync mit Sitepilot Mini/Midi beim Kunden
    ===========================================================================
    Ein privates Repo pro Website ist die Drehscheibe: Der Kunde (Mini/Midi)
-   schiebt seine Stände dorthin, VinWeb holt sie hier ab - und umgekehrt.
+   schiebt seine Stände dorthin, Sitepilot holt sie hier ab - und umgekehrt.
    Entscheid vom 05.09.2026; FTP/SSH bleibt reiner Deploy-Weg. */
 
 let fernZustand = null   // { url, tokenDa, eingehend, ausgehend }
@@ -2513,7 +2514,7 @@ function fernZeichnen () {
     : (z.eingehend > 0
       ? 'Der Kunde hat Stände hochgeladen, die dir hier noch fehlen - «Übernehmen» holt sie in deinen Verlauf.'
       : (z.ausgehend ? 'Deine neuesten Stände sind noch nicht im Fernlager - «Hochladen» bringt sie dem Kunden.'
-        : 'Alles im Gleichstand. Nach jedem gesicherten Stand lädt VinWeb automatisch hoch.'))
+        : 'Alles im Gleichstand. Nach jedem gesicherten Stand lädt Sitepilot automatisch hoch.'))
 }
 
 async function fernlagerLaden () {
@@ -2720,7 +2721,7 @@ function vergleichZeigen (m) {
 
   gruppe('Neu – im Projekt noch nicht vorhanden', m.neu, true, false)
   gruppe('Geändert – nur in Claude Design angepasst', m.geaendert, true, false)
-  gruppe('⚠ Konflikt – auch in VinWeb geändert (Übernehmen überschreibt deine VinWeb-Arbeit)', m.konflikte, false, true)
+  gruppe('⚠ Konflikt – auch in Sitepilot geändert (Übernehmen überschreibt deine Sitepilot-Arbeit)', m.konflikte, false, true)
 
   if (m.geloescht.length) {
     const g = el('div', 'v-gruppe')

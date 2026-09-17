@@ -1,9 +1,9 @@
-# VinWeb — Doku für den Entwickler-Check
+# Sitepilot — Doku für den Entwickler-Check
 
 Stand: 9. September 2026 · Dieses Paket ist der komplette Code des Werkzeugs,
 ohne Kundendaten (siehe «Was fehlt bewusst» ganz unten).
 
-## Was ist VinWeb?
+## Was ist Sitepilot?
 
 Eine **lokale** Node-App (bewusst ohne Framework, alle Kommentare Deutsch),
 mit der die Agentur Vincent & Partner Websites betreut: ZIP-Export aus
@@ -13,7 +13,7 @@ Freigabe) → Git-Verlauf → GitHub-Fernlager → Deploy per rsync auf das
 Hosting (cyon). Mehrere Kundenprojekte, ein Git-Repo pro Website.
 
 Zur Familie gehören zwei Schwester-Apps (nicht in diesem Paket):
-**VinWebMini/Midi** — das Kunden-Werkzeug (gleiche Technik, Ports 4500/4501),
+**Sitepilot Mini/Midi** — das Kunden-Werkzeug (gleiche Technik, Ports 4500/4501),
 das direkt auf demselben Projektordner bzw. im Fernbetrieb über dasselbe
 GitHub-Repo arbeitet. Sie werden später von einem Programmierer als
 Cloud-Version neu gebaut; dieses Werkzeug hier bleibt das Agentur-Werkzeug.
@@ -33,7 +33,7 @@ Oberfläche: http://127.0.0.1:4400 · Vorschau: http://127.0.0.1:4401
 Ohne Projekt ist die App leer — zum Testen ein beliebiges Website-ZIP
 (index.html im Stamm) über «Import & Ernte» hereinziehen.
 
-API-Schlüssel (Claude/OpenAI/GitHub-Token) liegen in `~/.vinweb/keys.json`
+API-Schlüssel (Claude/OpenAI/GitHub-Token) liegen in `~/.sitepilot/keys.json`
 (Modus 600) — **nie** im Projekt, nie im Repo; Eingabe über das ⚙ in der
 Oberfläche.
 
@@ -71,22 +71,22 @@ Das ist der Kern, den der Check bestätigen (oder widerlegen) soll:
 9. **Staging-Schutz:** jeder Staging-Deploy setzt robots.txt-Disallow +
    X-Robots-Tag neu; Live bekommt das nie (lib/deploy.js).
 10. **Vorschau-Injektionen:** In HTML-Seiten der Vorschau wird
-    `/__vinweb/bridge.js` injiziert (Brücke für die eingebauten
+    `/__sitepilot/bridge.js` injiziert (Brücke für die eingebauten
     Bild-Editoren; Schreiben nur über enge Endpunkte: `.state.json` am
     Stamm, Text nur bei genau-einmal-Treffer). Mit `?__baustein=<Selektor>`
-    zusätzlich `/__vinweb/baustein.js` (blendet für Miniaturen alles ausser
+    zusätzlich `/__sitepilot/baustein.js` (blendet für Miniaturen alles ausser
     einer Sektion aus; meldet nur die Höhe per postMessage, keine Daten).
 
 ## Ordnerstruktur
 
 ```
 server.js            Startpunkt: beide Server, alle Endpunkte, Warteschlange
-VinWeb.command       Doppelklick-Starter (selbstheilend, curl-Gesundheitscheck)
+Sitepilot.command       Doppelklick-Starter (selbstheilend, curl-Gesundheitscheck)
 ui/                  Oberfläche: index.html, app.js, style.css (kein Framework)
 lib/aenderungen.js   KI-Vorschläge zerlegen, Diffs zeigen, sicher anwenden
 lib/ai.js            Claude + OpenAI (Streaming, eigene Schlüssel)
 lib/analyze.js       Prüfbericht nach Import (Befunde, Struktur, Schlüsselfunde)
-lib/bausteine.js     Sektions-Ernte für VinWebMidi (Tag-Balancierung, bibliothek.json)
+lib/bausteine.js     Sektions-Ernte für Sitepilot Midi (Tag-Balancierung, bibliothek.json)
 lib/build.js         Produktions-Build (CDN lokalisieren, Bilder, Slugs, Bereinigung)
 lib/config.js        Ports und Pfade
 lib/deploy.js        rsync über SSH auf Staging/Live (Ziele in projekt.json)
@@ -97,7 +97,7 @@ lib/fortschritt.js   Der 8-Schritte-Weg zum Go-Live (Startseite)
 lib/geheim.js        Muster für Zugangsdaten-Dateien
 lib/git.js           Verlauf + GitHub-Fernlager (Sync mit Mini/Midi)
 lib/importer.js      ZIP-Import mit Schutzmassnahmen
-lib/keys.js          ~/.vinweb/keys.json (600), maskierte Anzeige
+lib/keys.js          ~/.sitepilot/keys.json (600), maskierte Anzeige
 lib/projects.js      Projekte anlegen/auflisten, Pfadauflösung
 lib/seo.js           SiteSett-Config übernehmen, SEO beim Build einprägen
 lib/vergleich.js     Frisches Claude-Design-ZIP gegen das Projekt vergleichen/übernehmen
@@ -128,8 +128,8 @@ Oberfläche (4400), alle unter `/api`:
   `POST …/bausteine/analyse`, `PUT|DELETE …/bausteine/:bid`
 
 Vorschau (4401): `/{projektId}/{seite}` (Quelle, mit Editor-Brücke),
-`/{projektId}/__build__/{seite}` (fertiger Build), `/__vinweb/bridge.js`,
-`/__vinweb/baustein.js`, `POST /__vinweb/schreiben`, `POST /__vinweb/text`.
+`/{projektId}/__build__/{seite}` (fertiger Build), `/__sitepilot/bridge.js`,
+`/__sitepilot/baustein.js`, `POST /__sitepilot/schreiben`, `POST /__sitepilot/text`.
 
 ## Datenformate
 
@@ -147,12 +147,12 @@ Ein privates GitHub-Repo pro Website ist die Drehscheibe. Regeln:
 
 - Kunde (Mini/Midi): beim Start + zyklisch `fetch`+`merge` (ff bevorzugt),
   nach jeder Aktion stiller `push`. Offline ist kein Fehler.
-- Agentur (VinWeb): nach jedem gesicherten Stand stiller Push (nie, wenn
+- Agentur (Sitepilot): nach jedem gesicherten Stand stiller Push (nie, wenn
   eingehende Stände da sind); «Abgleichen/Übernehmen/Hochladen» im
   Verlauf-Panel.
 - **Konflikt entscheidet immer die Agentur.** Kollidiert der Kunde lokal,
   pusht seine Instanz die festgefahrenen Stände als Zweig `kunde-wartet`
-  (`push -f main:kunde-wartet`); VinWeb zeigt «Kunde wartet», führt per
+  (`push -f main:kunde-wartet`); Sitepilot zeigt «Kunde wartet», führt per
   Knopf zusammen (`-X ours`/`-X theirs`), löscht den Zweig und pusht main —
   der Kunde bekommt die Lösung beim nächsten Takt per Fast-Forward.
 
@@ -172,7 +172,7 @@ Konsolidierung der zwei CSS-Schichten in ui/style.css (alte Schicht +
 
 1. Die Vorschau-Middleware (server.js unten): Dekodier-Reihenfolge,
    `.git`/`..`/`.php`-Sperren, `__build__`-Zweig.
-2. `pfadPruefen` und alle Schreib-Endpunkte (`/anwenden`, `/__vinweb/…`,
+2. `pfadPruefen` und alle Schreib-Endpunkte (`/anwenden`, `/__sitepilot/…`,
    SEO/Build/Vergleich): kommt man aus dem Projektordner heraus?
 3. `execFile`-Aufrufe (git.js, deploy.js, ernte): Argument-Injektion?
 4. Fernlager: Token-Behandlung, `kunde-wartet`-Ablauf, Merge-Strategien.
@@ -186,7 +186,7 @@ Konsolidierung der zwei CSS-Schichten in ui/style.css (alte Schicht +
 - `projects/` und `ernte/` — echte Kundendaten und -inhalte.
 - `node_modules/` — `npm install` stellt alles her (package-lock liegt bei).
 - `.git/` des Werkzeugs selbst und lokale Editor-/Session-Ordner.
-- Jegliche Schlüssel: liegen ausschliesslich in `~/.vinweb/keys.json` des
+- Jegliche Schlüssel: liegen ausschliesslich in `~/.sitepilot/keys.json` des
   jeweiligen Rechners. Das Paket wurde vor dem Packen auf Schlüsselmuster
   gescannt (sauber).
 - `ui/*.vor-umbau` — reine Vorher-Sicherungen.

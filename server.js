@@ -1,4 +1,4 @@
-// VinWeb - Startpunkt.
+// Sitepilot - Startpunkt.
 //
 // Es laufen zwei Server nebeneinander:
 //   Port 4400  Bedienoberflaeche und Schnittstelle
@@ -78,7 +78,7 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '60mb' }))
 
-// Oberfläche nie cachen: Nach jedem VinWeb-Update genügt normales Neuladen –
+// Oberfläche nie cachen: Nach jedem Sitepilot-Update genügt normales Neuladen –
 // kein «warum sehe ich die neue Funktion nicht»-Rätsel mehr.
 app.use(express.static(path.join(ROOT, 'ui'), {
   etag: false,
@@ -339,11 +339,11 @@ app.post('/api/chat', async (req, res) => {
     // Verbrauch höchstens zweimal pro Sekunde weiterreichen – reicht fürs Auge.
     let letzterPuls = 0
 
-    // Automatisches Nachreichen: Fordert die KI Dateien an (VINWEB-BRAUCHE-Zeile),
-    // prüft VinWeb die Pfade, liefert die Inhalte nach und lässt sie die Aufgabe
+    // Automatisches Nachreichen: Fordert die KI Dateien an (SITEPILOT-BRAUCHE-Zeile),
+    // prüft Sitepilot die Pfade, liefert die Inhalte nach und lässt sie die Aufgabe
     // im selben Durchgang fertig lösen. Höchstens eine Nachlieferungs-Runde –
     // sonst könnte eine verwirrte KI endlos Dateien anfordern und Kosten anhäufen.
-    const BRAUCHE = /===\s*VINWEB-BRAUCHE:\s*([^=]+?)\s*===/i
+    const BRAUCHE = /===\s*SITEPILOT-BRAUCHE:\s*([^=]+?)\s*===/i
     const wurzelChat = quellPfad(projektId)
     let aktuelleNachrichten = nachrichten
     let text = ''
@@ -443,7 +443,7 @@ app.post('/api/chat', async (req, res) => {
       if (!geliefert.length) {
         // Angefordert, aber nichts lieferbar – das dem Nutzer klar sagen,
         // statt die Antwort einfach abbrechen zu lassen.
-        const hinweis = `\n\n［VinWeb: ${verweigert.join(', ')} wird nicht übergeben – `
+        const hinweis = `\n\n［Sitepilot: ${verweigert.join(', ')} wird nicht übergeben – `
           + 'Zugangsdaten bleiben immer aussen vor, Übriges wurde nicht gefunden.］'
         senden('text', { t: hinweis })
         text += hinweis
@@ -451,7 +451,7 @@ app.post('/api/chat', async (req, res) => {
       }
 
       senden('kontextErweitert', { dateien: geliefert, verweigert })
-      senden('text', { t: `\n\n［VinWeb reicht automatisch nach: ${geliefert.join(', ')}］\n\n` })
+      senden('text', { t: `\n\n［Sitepilot reicht automatisch nach: ${geliefert.join(', ')}］\n\n` })
 
       aktuelleNachrichten = [
         ...aktuelleNachrichten,
@@ -495,7 +495,7 @@ app.post('/api/anwenden', (req, res) => {
 
     const mitRepo = await istRepo(projektId)
     // Erst alles festhalten, was sich seit dem letzten Mal von aussen geändert
-    // hat – sonst ginge Arbeit ausserhalb von VinWeb beim Zurücksetzen verloren.
+    // hat – sonst ginge Arbeit ausserhalb von Sitepilot beim Zurücksetzen verloren.
     if (mitRepo) await sichern(projektId, 'Änderungen von aussen')
 
     const ergebnis = await anwenden(projektId, dateien, notiz, !mitRepo)
@@ -613,7 +613,7 @@ app.post('/api/projekte/:id/zurueck-datei', (req, res) => nacheinander(req.param
 let ernteLaeuft = false
 
 // ---------------------------------------------------------------------------
-// Fernlager (GitHub) - Sync zwischen VinWeb und Mini/Midi
+// Fernlager (GitHub) - Sync zwischen Sitepilot und Mini/Midi
 // ---------------------------------------------------------------------------
 
 // Zustand fuer die Oberflaeche - ohne Netz (rechnet gegen den zuletzt
@@ -870,7 +870,7 @@ app.put('/api/projekte/:id/fortschritt', async (req, res) => {
     const def = SCHRITTE.find(s => s.id === schritt)
     if (!def) return res.status(400).json({ fehler: 'Unbekannter Schritt.' })
     if (def.art === 'auto') {
-      return res.status(400).json({ fehler: 'Diesen Schritt misst VinWeb selbst – er lässt sich nicht von Hand setzen.' })
+      return res.status(400).json({ fehler: 'Diesen Schritt misst Sitepilot selbst – er lässt sich nicht von Hand setzen.' })
     }
     if (def.id === 'golive') {
       return res.status(400).json({ fehler: 'Der Go-Live-Haken kommt mit dem Deploy (Etappe 6).' })
@@ -936,7 +936,7 @@ app.post('/api/projekte/:id/deploy-test', async (req, res) => {
     const { promisify } = await import('node:util')
     const lauf = promisify(execFile)
     await lauf('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', projekt.deploy.host,
-      'mkdir -p ' + projekt.deploy.staging.replace(/[^a-zA-Z0-9._/-]/g, '') + ' && echo VINWEB_OK'],
+      'mkdir -p ' + projekt.deploy.staging.replace(/[^a-zA-Z0-9._/-]/g, '') + ' && echo SITEPILOT_OK'],
       { timeout: 20000 })
     res.json({ ok: true })
   } catch (e) {
@@ -1253,11 +1253,11 @@ app.get('/api/projekte/:id/build', async (req, res) => {
 })
 
 // ---------------------------------------------------------------------------
-// Baustein-Bibliothek (fuer VinWebMidi, Etappe 2)
+// Baustein-Bibliothek (fuer Sitepilot Midi, Etappe 2)
 // ---------------------------------------------------------------------------
 // Die Agentur erntet aus fertigen Seiten Design-Bausteine, prueft und benennt
 // sie hier und gibt sie frei. Ergebnis: bibliothek.json im Projektordner -
-// daraus komponiert VinWebMidi spaeter neue Unterseiten (KI waehlt nur
+// daraus komponiert Sitepilot Midi spaeter neue Unterseiten (KI waehlt nur
 // Bausteine, schreibt nie eigenes HTML).
 
 // Die Bibliothek samt Etiketten-Vokabular lesen.
@@ -1403,14 +1403,14 @@ const vorschau = express()
 // und reicht die Daten an den Endpunkt unten weiter.
 // ---------------------------------------------------------------------------
 
-const BRIDGE_JS = `// VinWeb-Brücke für die eingebauten Bild-Editoren.
-window.__vinwebBridgeVersion = 4;
+const BRIDGE_JS = `// Sitepilot-Brücke für die eingebauten Bild-Editoren.
+window.__sitepilotBridgeVersion = 4;
 // Erlaubt sind nur die .state.json-Sidecars am Projektstamm – das erzwingt
 // der Server, nicht dieses Skript.
 window.omelette = window.omelette || {};
 window.omelette.writeFile = function (name, inhalt) {
   var projekt = decodeURIComponent(location.pathname.split('/')[1] || '');
-  return fetch('/__vinweb/schreiben', {
+  return fetch('/__sitepilot/schreiben', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ projekt: projekt, name: name, inhalt: inhalt })
@@ -1475,7 +1475,7 @@ document.addEventListener('click', function (e) {
       if (!speichern) el.innerHTML = alt;
       return;
     }
-    fetch('/__vinweb/text', {
+    fetch('/__sitepilot/text', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -1495,7 +1495,7 @@ document.addEventListener('click', function (e) {
       }
     }).catch(function () {
       el.innerHTML = alt;
-      meldung('Speichern fehlgeschlagen - läuft VinWeb noch?', false);
+      meldung('Speichern fehlgeschlagen - läuft Sitepilot noch?', false);
     });
   }
 
@@ -1529,7 +1529,7 @@ document.addEventListener('click', function (e) {
 })();
 `
 
-vorschau.get('/__vinweb/bridge.js', (req, res) => {
+vorschau.get('/__sitepilot/bridge.js', (req, res) => {
   // Nie cachen: sonst arbeiten Browser nach Brücken-Updates mit alten Fassungen
   // weiter – "Fix wirkt bei mir nicht"-Effekte.
   res.set('Cache-Control', 'no-store')
@@ -1545,10 +1545,10 @@ vorschau.get('/__vinweb/bridge.js', (req, res) => {
 // Geheimnisse darin, darum targetOrigin '*').
 // ---------------------------------------------------------------------------
 
-const BAUSTEIN_JS = `// VinWeb-Baustein-Miniatur: zeigt nur eine Sektion der Seite.
+const BAUSTEIN_JS = `// Sitepilot-Baustein-Miniatur: zeigt nur eine Sektion der Seite.
 (function () {
   function anwenden () {
-    var sel = window.__vinwebBaustein
+    var sel = window.__sitepilotBaustein
     var ziel
     try { ziel = document.querySelector(sel) } catch (e) {}
     if (!ziel) return
@@ -1566,7 +1566,7 @@ const BAUSTEIN_JS = `// VinWeb-Baustein-Miniatur: zeigt nur eine Sektion der Sei
     window.scrollTo(0, 0)
     function melden () {
       try {
-        parent.postMessage({ typ: 'vinweb-baustein-masse', sel: sel,
+        parent.postMessage({ typ: 'sitepilot-baustein-masse', sel: sel,
           hoehe: ziel.getBoundingClientRect().height }, '*')
       } catch (e) {}
     }
@@ -1579,7 +1579,7 @@ const BAUSTEIN_JS = `// VinWeb-Baustein-Miniatur: zeigt nur eine Sektion der Sei
 })()
 `
 
-vorschau.get('/__vinweb/baustein.js', (req, res) => {
+vorschau.get('/__sitepilot/baustein.js', (req, res) => {
   res.type('application/javascript; charset=utf-8').send(BAUSTEIN_JS)
 })
 
@@ -1598,7 +1598,7 @@ function vorschauSchreibrecht (req, projekt) {
   return true
 }
 
-vorschau.post('/__vinweb/schreiben', express.json({ limit: '40mb' }), (req, res) => {
+vorschau.post('/__sitepilot/schreiben', express.json({ limit: '40mb' }), (req, res) => {
   const projekt = path.basename(String(req.body?.projekt || ''))
   if (!vorschauSchreibrecht(req, projekt)) {
     return res.status(403).json({ fehler: 'Schreiben nur ins eigene Projekt und nicht aus der Build-Ansicht.' })
@@ -1624,7 +1624,7 @@ vorschau.post('/__vinweb/schreiben', express.json({ limit: '40mb' }), (req, res)
 // Nimmt Textänderungen aus der Vorschau entgegen. Bewusst streng:
 // Die Änderung wird NUR geschrieben, wenn der alte Ausschnitt in der
 // Quelldatei GENAU EINMAL vorkommt – sonst Ablehnung statt Raterei.
-vorschau.post('/__vinweb/text', express.json({ limit: '1mb' }), (req, res) => {
+vorschau.post('/__sitepilot/text', express.json({ limit: '1mb' }), (req, res) => {
   const projekt = path.basename(String(req.body?.projekt || ''))
   if (!vorschauSchreibrecht(req, projekt)) {
     return res.status(403).json({ fehler: 'Schreiben nur ins eigene Projekt und nicht aus der Build-Ansicht.' })
@@ -1738,7 +1738,7 @@ vorschau.use(async (req, res, next) => {
 
   if (teile.length === 0) {
     return res.status(404).type('text/plain; charset=utf-8')
-      .send('VinWeb-Vorschau. Der Aufruf lautet /<projekt>/<seite>.')
+      .send('Sitepilot-Vorschau. Der Aufruf lautet /<projekt>/<seite>.')
   }
 
   const id = teile[0]
@@ -1755,7 +1755,7 @@ vorschau.use(async (req, res, next) => {
     }
   }
 
-  // Der Verlauf (.git) ist die Buchhaltung von VinWeb, nie Teil der Website.
+  // Der Verlauf (.git) ist die Buchhaltung von Sitepilot, nie Teil der Website.
   // Ohne diese Sperre könnte ein Skript aus einem importierten ZIP die
   // komplette Projektgeschichte auslesen – samt Ständen längst gelöschter
   // Dateien. Kleinschreibung prüfen, weil das Mac-Dateisystem .GIT und .git
@@ -1773,13 +1773,13 @@ vorschau.use(async (req, res, next) => {
       // Die Brücke MUSS vor den Editor-Skripten laufen: image-slot entscheidet
       // genau einmal beim Aufbau, ob es bearbeitbar ist – käme die Brücke erst
       // am Seitenende, blieben alle Slots dauerhaft schreibgeschützt.
-      let brueckenTag = '<script src="/__vinweb/bridge.js"></script>'
+      let brueckenTag = '<script src="/__sitepilot/bridge.js"></script>'
       // Baustein-Miniatur gewuenscht? Selektor sicher (als JSON) uebergeben.
       const bausteinSel = new URLSearchParams(abfrage || '').get('__baustein')
       if (bausteinSel) {
-        brueckenTag += '\n<script>window.__vinwebBaustein = '
+        brueckenTag += '\n<script>window.__sitepilotBaustein = '
           + JSON.stringify(bausteinSel).replace(/</g, '\\u003c')
-          + '</script>\n<script src="/__vinweb/baustein.js"></script>'
+          + '</script>\n<script src="/__sitepilot/baustein.js"></script>'
       }
       if (/<head[^>]*>/i.test(inhalt)) {
         inhalt = inhalt.replace(/<head([^>]*)>/i, '<head$1>\n' + brueckenTag)
@@ -1819,17 +1819,17 @@ vorschau.use((req, res) => {
 // aber nicht sterben – sonst steht ohne Vorwarnung alles still (und der
 // --watch-Neustart hängt am noch belegten Port fest).
 process.on('unhandledRejection', (e) => {
-  console.error('[VinWeb] Unbehandelter Fehler (weitergelaufen):', e?.stack || e)
+  console.error('[Sitepilot] Unbehandelter Fehler (weitergelaufen):', e?.stack || e)
 })
 process.on('uncaughtException', (e) => {
-  console.error('[VinWeb] Unerwarteter Fehler (weitergelaufen):', e?.stack || e)
+  console.error('[Sitepilot] Unerwarteter Fehler (weitergelaufen):', e?.stack || e)
 })
 
 await fs.mkdir(PROJECTS_DIR, { recursive: true })
 
 // Start mit Wiederholung: Beim --watch-Neustart gibt der alte Prozess den
 // Port oft erst nach einem Moment frei. Frueher: sofort aufgeben -> die
-// Ueberwachung wartete ewig und VinWeb war "einfach weg". Jetzt: bis zu
+// Ueberwachung wartete ewig und Sitepilot war "einfach weg". Jetzt: bis zu
 // 15 Sekunden lang erneut versuchen, erst dann wirklich aufgeben.
 function lauschenMitWiederholung (anwendung, port, dann) {
   let versuche = 0
@@ -1843,7 +1843,7 @@ function lauschenMitWiederholung (anwendung, port, dann) {
       } else if (e.code === 'EADDRINUSE') {
         console.error('')
         console.error(`  Port ${port} bleibt belegt.`)
-        console.error('  Vermutlich läuft VinWeb bereits in einem anderen Fenster.')
+        console.error('  Vermutlich läuft Sitepilot bereits in einem anderen Fenster.')
         console.error(`  Beenden mit:  lsof -ti tcp:${port} | xargs kill`)
         console.error('')
         process.exit(1)
@@ -1858,7 +1858,7 @@ function lauschenMitWiederholung (anwendung, port, dann) {
 
 lauschenMitWiederholung(app, UI_PORT, () => {
   console.log('')
-  console.log('  VinWeb läuft.')
+  console.log('  Sitepilot läuft.')
   console.log('')
   console.log(`  Oberfläche   http://${HOST}:${UI_PORT}`)
   console.log(`  Vorschau      http://${HOST}:${PREVIEW_PORT}`)

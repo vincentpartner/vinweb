@@ -1,9 +1,9 @@
 {
-  "name": "vinweb",
+  "name": "sitepilot",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "VinWeb - Lokale Oberflaeche: Claude-Design-Export importieren, pruefen, anpassen, veroeffentlichen.",
+  "description": "Sitepilot - Lokale Oberflaeche: Claude-Design-Export importieren, pruefen, anpassen, veroeffentlichen.",
   "scripts": {
     "start": "node --watch server.js"
   },
