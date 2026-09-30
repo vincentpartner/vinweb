@@ -22,7 +22,7 @@ import { ernten, ERNTE_DIR } from './lib/ernte.js'
 import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren } from './lib/seo.js'
 import { fortschrittBerechnen, SCHRITTE } from './lib/fortschritt.js'
 import { endpruefungLaufen } from './lib/endpruefung.js'
-import { deployAusfuehren, stagingSchutzEinbetten, hostGueltig, pfadGueltig } from './lib/deploy.js'
+import { deployAusfuehren, stagingSchutzEinbetten, hostGueltig, pfadGueltig, serverPfad } from './lib/deploy.js'
 import { geheimnisImInhalt } from './lib/geheim.js'
 import { GEHEIM_DATEINAME } from './lib/geheim.js'
 import { execFile } from 'node:child_process'
@@ -952,7 +952,7 @@ app.post('/api/projekte/:id/deploy-test', async (req, res) => {
     const { promisify } = await import('node:util')
     const lauf = promisify(execFile)
     await lauf('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', projekt.deploy.host,
-      'mkdir -p ' + projekt.deploy.staging.replace(/[^a-zA-Z0-9._/-]/g, '') + ' && echo SITEPILOT_OK'],
+      'mkdir -p ' + serverPfad(projekt.deploy.staging).replace(/[^a-zA-Z0-9._/-]/g, '') + ' && echo SITEPILOT_OK'],
       { timeout: 20000 })
     res.json({ ok: true })
   } catch (e) {
@@ -1420,7 +1420,7 @@ const vorschau = express()
 // ---------------------------------------------------------------------------
 
 const BRIDGE_JS = `// Sitepilot-Brücke für die eingebauten Bild-Editoren.
-window.__sitepilotBridgeVersion = 4;
+window.__sitepilotBridgeVersion = 5;
 // Erlaubt sind nur die .state.json-Sidecars am Projektstamm – das erzwingt
 // der Server, nicht dieses Skript.
 window.omelette = window.omelette || {};
@@ -1482,6 +1482,7 @@ document.addEventListener('click', function (e) {
   function beenden (speichern) {
     if (!aktiv) return;
     var el = aktiv.el, alt = aktiv.alt;
+    el.style.pointerEvents = aktiv.altePointerEvents || '';
     aktiv = null;
     el.contentEditable = 'false';
     el.style.outline = '';
@@ -1515,9 +1516,30 @@ document.addEventListener('click', function (e) {
     });
   }
 
+  // Manche Seiten setzen pointer-events:none auf ihre Texte (Klicks sollen
+  // zum Hintergrund durchfallen). Dann trifft der Doppelklick nie ein
+  // Textelement – wir suchen in dem Fall GEOMETRISCH das kleinste
+  // Textelement unter dem Klickpunkt.
+  function textElementAmPunkt (x, y) {
+    var bester = null, besteFlaeche = Infinity;
+    var alle = document.querySelectorAll(TAGS);
+    for (var i = 0; i < alle.length; i++) {
+      var el = alle[i];
+      var r = el.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        var f = r.width * r.height;
+        if (f > 0 && f < besteFlaeche && (el.textContent || '').trim()) {
+          bester = el; besteFlaeche = f;
+        }
+      }
+    }
+    return bester;
+  }
+
   document.addEventListener('dblclick', function (e) {
     if (aktiv) return;
     var el = e.target && e.target.closest ? e.target.closest(TAGS) : null;
+    if (!el) el = textElementAmPunkt(e.clientX, e.clientY);
     if (!el || el.closest('[contenteditable="true"]')) return;
     // Bereiche mit Medien oder eigener Technik gehören dem Chat, nicht dem Doppelklick.
     if (el.querySelector('img,svg,canvas,video,script,iframe,style,image-slot,scroll-shot')) {
@@ -1526,7 +1548,8 @@ document.addEventListener('click', function (e) {
     }
     if (el.innerHTML.length > 8000) return;
     e.preventDefault();
-    aktiv = { el: el, alt: el.innerHTML };
+    aktiv = { el: el, alt: el.innerHTML, altePointerEvents: el.style.pointerEvents };
+    el.style.pointerEvents = 'auto';
     el.contentEditable = 'true';
     el.style.outline = '2px solid #3FBDB6';
     el.style.outlineOffset = '2px';
