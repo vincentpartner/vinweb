@@ -19,10 +19,10 @@ import { vergleichErstellen, vergleichUebernehmen } from './lib/vergleich.js'
 import { projektAnalysieren } from './lib/analyze.js'
 import { buildErzeugen, buildPfad } from './lib/build.js'
 import { ernten, ERNTE_DIR } from './lib/ernte.js'
-import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren } from './lib/seo.js'
+import { leeresSeo, leereSeite, ausSiteSett, seoAnwenden, seoZusammenfuehren, robotsBauen } from './lib/seo.js'
 import { fortschrittBerechnen, SCHRITTE } from './lib/fortschritt.js'
-import { endpruefungLaufen } from './lib/endpruefung.js'
-import { deployAusfuehren, stagingSchutzEinbetten, hostGueltig, pfadGueltig, serverPfad } from './lib/deploy.js'
+import { endpruefungLaufen, buildFingerabdruck } from './lib/endpruefung.js'
+import { deployAusfuehren, stagingSchutzEinbetten, stagingSchutzEntfernen, hostGueltig, pfadGueltig, serverPfad } from './lib/deploy.js'
 import { geheimnisImInhalt } from './lib/geheim.js'
 import { GEHEIM_DATEINAME } from './lib/geheim.js'
 import { execFile } from 'node:child_process'
@@ -889,10 +889,23 @@ app.put('/api/projekte/:id/fortschritt', async (req, res) => {
       return res.status(400).json({ fehler: 'Diesen Schritt misst Sitepilot selbst – er lässt sich nicht von Hand setzen.' })
     }
     if (def.id === 'golive') {
-      return res.status(400).json({ fehler: 'Der Go-Live-Haken kommt mit dem Deploy (Etappe 6).' })
+      return res.status(400).json({ fehler: 'Der Go-Live-Haken wird vom Livegang selbst gesetzt – der Knopf dafür sitzt auf der Startseite.' })
     }
     projekt.fortschritt = projekt.fortschritt || {}
     projekt.fortschritt[schritt] = Boolean(fertig)
+    // Die Abnahme (Schritt 8) friert den Quell-Stand ein: erst offene
+    // Änderungen sichern, dann den Hash merken. Der Livegang vergleicht
+    // später gegen genau diesen Stand.
+    if (schritt === 'staging') {
+      if (fertig) {
+        try { await sichern(req.params.id, 'Abnahme: Testserver geprüft') } catch { /* ohne Repo ohne Einfrieren */ }
+        let hash = null
+        try { if (await istRepo(req.params.id)) hash = (await verlauf(req.params.id))[0]?.hash || null } catch {}
+        projekt.abnahme = { stand: hash, am: new Date().toISOString() }
+      } else {
+        delete projekt.abnahme
+      }
+    }
     await projektSchreiben(req.params.id, projekt)
     res.json(await fortschrittBerechnen(projekt))
   } catch (e) {
@@ -916,7 +929,7 @@ app.put('/api/projekte/:id/deploy-ziel', async (req, res) => {
   try {
     const projekt = await projektLesen(req.params.id)
     if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
-    const { host, staging, stagingUrl } = req.body || {}
+    const { host, staging, stagingUrl, live, liveUrl } = req.body || {}
     if (!hostGueltig(host)) {
       return res.status(400).json({ fehler: 'Zugang bitte als benutzer@server angeben, z. B. zojegozo@s130.cyon.net.' })
     }
@@ -927,11 +940,25 @@ app.put('/api/projekte/:id/deploy-ziel', async (req, res) => {
     if (url && !/^https?:[/][/][a-z0-9.-]+/i.test(url)) {
       return res.status(400).json({ fehler: 'Die Adresse muss mit http:// oder https:// beginnen.' })
     }
+    // Live-Ziel ist freiwillig – wird aber geprüft, sobald etwas drinsteht.
+    const livePfad = String(live || '').trim().replace(/[/]+$/, '')
+    if (livePfad && !pfadGueltig(livePfad)) {
+      return res.status(400).json({ fehler: 'Live-Ordner bitte relativ angeben, z. B. public_html/example.ch – ohne führenden Schrägstrich, ohne «..».' })
+    }
+    if (livePfad && livePfad === String(staging).trim().replace(/[/]+$/, '')) {
+      return res.status(400).json({ fehler: 'Live-Ordner und Testserver-Ordner dürfen nicht derselbe sein – sonst überschreibt der nächste Test-Deploy die Live-Website mit der Suchmaschinen-Sperre.' })
+    }
+    let lUrl = String(liveUrl || '').trim()
+    if (lUrl && !/^https?:[/][/][a-z0-9.-]+/i.test(lUrl)) {
+      return res.status(400).json({ fehler: 'Die Live-Adresse muss mit http:// oder https:// beginnen.' })
+    }
     projekt.deploy = {
       ...(projekt.deploy || {}),
       host: String(host).trim(),
       staging: String(staging).trim().replace(/[/]+$/, ''),
       stagingUrl: url.replace(/[/]+$/, ''),
+      live: livePfad,
+      liveUrl: lUrl.replace(/[/]+$/, ''),
     }
     await projektSchreiben(req.params.id, projekt)
     res.json({ ok: true, deploy: projekt.deploy })
@@ -987,6 +1014,73 @@ app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander(req.para
     res.json({ ...ergebnis, meldungen })
   } catch (e) {
     res.status(500).json({ fehler: e.message })
+  }
+}))
+
+// ---------------------------------------------------------------------------
+// Go-Live (Schritt 9): den abgenommenen Stand unverändert live stellen
+// ---------------------------------------------------------------------------
+//
+// Bewusst KEIN Neubau: Live geht exakt der Build, den die KI-Endprüfung
+// bestanden hat und den du auf dem Testserver abgenommen hast – nur der
+// Staging-Schutz (robots-Sperre + X-Robots-Tag) wird vorher entfernt.
+// Hat sich die Quelle seit der Abnahme geändert, bricht der Livegang ab.
+
+app.post('/api/projekte/:id/deploy/live', (req, res) => nacheinander(req.params.id, async () => {
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    if (!projekt.deploy?.host || !projekt.deploy?.live) {
+      return res.status(400).json({ fehler: 'Kein Live-Ziel eingerichtet – im Reiter Build unter «Ziel ändern» den Live-Ordner eintragen.' })
+    }
+
+    // Erst offene Änderungen sichern, DANN messen: so fällt jede noch nicht
+    // gesicherte Bearbeitung sauber als «Build nicht mehr aktuell» auf.
+    try { await sichern(req.params.id, 'Stand vor Go-Live') } catch { /* ohne Repo keine Sicherung */ }
+    const f = await fortschrittBerechnen(projekt)
+    if (!f.bereit) {
+      const offen = f.schritte.filter(s => !s.fertig && s.id !== 'golive').map(s => s.titel).join(', ')
+      return res.status(409).json({ fehler: 'Noch nicht bereit für den Livegang – offen: ' + offen + '.' })
+    }
+    let hashJetzt = null
+    try { if (await istRepo(req.params.id)) hashJetzt = (await verlauf(req.params.id))[0]?.hash || null } catch {}
+    if (projekt.abnahme?.stand && hashJetzt && projekt.abnahme.stand !== hashJetzt) {
+      return res.status(409).json({ fehler: 'Die Quelle hat sich seit deiner Abnahme geändert – bitte neu auf den Testserver stellen, prüfen und Schritt 8 erneut abhaken.' })
+    }
+
+    const meldungen = []
+    const ordner = buildPfad(req.params.id)
+    const abdruckVorher = await buildFingerabdruck(ordner)
+    meldungen.push('Abgenommener Stand bestätigt – entferne den Staging-Schutz …')
+    await stagingSchutzEntfernen(ordner, projekt.seo ? robotsBauen(projekt.seo) : null)
+    const abdruckNachher = await buildFingerabdruck(ordner)
+
+    // Zielordner anlegen (wiederholbar und harmlos) – der erste Livegang
+    // braucht ihn, BatchMode fragt nie nach Passwörtern.
+    const { execFile } = await import('node:child_process')
+    const { promisify } = await import('node:util')
+    const lauf = promisify(execFile)
+    await lauf('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', projekt.deploy.host,
+      'mkdir -p ' + serverPfad(projekt.deploy.live).replace(/[^a-zA-Z0-9._/-]/g, '')], { timeout: 20000 })
+
+    const ergebnis = await deployAusfuehren(projekt, 'live', (t) => meldungen.push(t))
+    projekt.fortschritt = projekt.fortschritt || {}
+    projekt.fortschritt.golive = true
+    projekt.liveGang = {
+      am: ergebnis.am,
+      stand: hashJetzt,
+      url: projekt.deploy.liveUrl || '',
+      gepruefterAbdruck: abdruckVorher,   // Build, wie ihn die Endprüfung sah
+      buildAbdruck: abdruckNachher,       // derselbe Build ohne Staging-Schutz
+    }
+    await projektSchreiben(req.params.id, projekt)
+    meldungen.push('Live! ' + (projekt.deploy.liveUrl || ''))
+    res.json({ ...ergebnis, meldungen })
+  } catch (e) {
+    const text = /Permission denied|publickey/i.test(String(e.stderr || e.message))
+      ? 'Der Server kennt deinen SSH-Schlüssel nicht – den öffentlichen Schlüssel einmalig bei diesem Hosting hinterlegen.'
+      : e.message
+    res.status(500).json({ fehler: text })
   }
 }))
 

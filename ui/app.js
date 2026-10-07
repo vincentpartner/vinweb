@@ -2004,10 +2004,35 @@ function startZeichnen (f) {
     kt.appendChild(el('span', null, naechster ? `Als Nächstes: ${naechster.titel}` : ''))
   }
   karte.appendChild(kt)
-  const golive = el('button', 'btn primary', f.live ? 'Ist live' : 'Livegang')
-  golive.disabled = true
-  golive.title = 'Kommt mit dem Deploy (Etappe 6) – dann startet hier der Livegang.'
+  // Der Go-Live-Knopf: scharf, sobald alle Vorstufen grün sind UND ein
+  // Live-Ziel eingerichtet ist. Danach dient er als «neue Fassung live».
+  const golive = el('button', 'btn primary')
+  if (f.bereit && f.liveZiel) {
+    golive.textContent = f.live ? 'Neue Fassung live stellen' : 'Jetzt live schalten'
+    golive.title = 'Stellt den abgenommenen Stand vom Testserver unverändert auf die Live-Adresse.'
+    golive.onclick = () => liveSchalten(golive)
+  } else if (f.live) {
+    golive.textContent = 'Ist live'
+    golive.disabled = true
+    golive.title = 'Für eine neue Fassung zuerst wieder alle Schritte grün machen.'
+  } else if (f.bereit) {
+    golive.textContent = 'Live-Ziel fehlt'
+    golive.disabled = true
+    golive.title = 'Im Reiter Build unter «Ziel ändern» den Live-Ordner und die Live-Adresse eintragen.'
+  } else {
+    golive.textContent = 'Livegang'
+    golive.disabled = true
+    golive.title = 'Wird frei, sobald die Schritte 1–8 grün sind.'
+  }
   karte.appendChild(golive)
+  if (f.live && f.liveUrl) {
+    const offen = el('a', 'btn', 'Live-Adresse öffnen')
+    offen.href = f.liveUrl
+    offen.target = '_blank'
+    offen.rel = 'noopener'
+    offen.style.textDecoration = 'none'
+    karte.appendChild(offen)
+  }
   box.appendChild(karte)
 
   // Die acht Schritte
@@ -2053,6 +2078,34 @@ function startZeichnen (f) {
     liste.appendChild(zeile)
   }
   box.appendChild(liste)
+}
+
+// Schritt 9: der Livegang. Eine letzte, bewusste Bestätigung – danach geht
+// der abgenommene Stand unverändert auf die Live-Adresse (ohne Staging-Schutz).
+async function liveSchalten (knopf) {
+  if (!aktuell) return
+  const d = aktuell.deploy || {}
+  const frage = 'Jetzt live schalten?\n\n'
+    + 'Ziel auf dem Server: ' + (d.live || '?') + '\n'
+    + 'Live-Adresse: ' + (d.liveUrl || '(keine angegeben)') + '\n\n'
+    + 'Es geht exakt der Stand live, den du auf dem Testserver abgenommen hast – '
+    + 'die Suchmaschinen-Sperre wird dabei entfernt.'
+  if (!confirm(frage)) return
+  knopf.disabled = true
+  knopf.textContent = 'Wird live gestellt …'
+  banner('Livegang läuft – abgenommener Stand wird übertragen …', 'laeuft')
+  try {
+    const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/deploy/live`, { method: 'POST' })
+    const e = await antwort.json()
+    if (!antwort.ok) throw new Error(e.fehler)
+    banner(`✓ Live! ${e.uebertragen} Datei(en) übertragen.` + (e.url ? ' → ' + e.url : ''), 'ok')
+    status('Website ist live.' + (e.url ? ' ' + e.url : ''), 'ok')
+  } catch (e) {
+    banner('Livegang abgebrochen: ' + e.message, 'fehler')
+    status('Livegang abgebrochen: ' + e.message, 'err')
+  } finally {
+    fortschrittLaden()
+  }
 }
 
 
@@ -2797,6 +2850,8 @@ async function zielFormularFuellen () {
   $('#zielHost').value = d.host || ''
   $('#zielPfad').value = d.staging || ''
   $('#zielUrl').value = d.stagingUrl || ''
+  $('#zielLivePfad').value = d.live || ''
+  $('#zielLiveUrl').value = d.liveUrl || ''
   if (!$('#zielHost').value) {
     try {
       const v = await (await fetch('/api/deploy-vorschlag')).json()
@@ -2831,6 +2886,8 @@ $('#btnZielSpeichern').onclick = async () => {
         host: $('#zielHost').value.trim(),
         staging: $('#zielPfad').value.trim(),
         stagingUrl: $('#zielUrl').value.trim(),
+        live: $('#zielLivePfad').value.trim(),
+        liveUrl: $('#zielLiveUrl').value.trim(),
       }),
     })
     const d = await antwort.json()
