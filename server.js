@@ -863,6 +863,23 @@ app.get('/api/projekte/:id/zip', async (req, res) => {
   }
 })
 
+// Projektname ändern – nur der Anzeigename, der Ordner bleibt, wie er ist
+// (so gehen Verlauf, Vorschau-Adressen und Server-Ziele nie kaputt).
+app.put('/api/projekte/:id/name', async (req, res) => {
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    const name = String(req.body?.name || '').trim()
+    if (!name) return res.status(400).json({ fehler: 'Der Name darf nicht leer sein.' })
+    if (name.length > 80) return res.status(400).json({ fehler: 'Der Name ist zu lang (höchstens 80 Zeichen).' })
+    projekt.name = name
+    await projektSchreiben(req.params.id, projekt)
+    res.json({ ok: true, name })
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+})
+
 // ---------------------------------------------------------------------------
 // Fortschritt: der Weg zum Go-Live
 // ---------------------------------------------------------------------------
@@ -1187,9 +1204,25 @@ app.post('/api/projekte/:id/vergleich/uebernehmen', (req, res) => nacheinander(r
 // ---------------------------------------------------------------------------
 
 // Für jede Seite der Analyse einen SEO-Eintrag anbieten – vorhandene bleiben.
+// Auch Seiten in Sprach- und Unterordnern (en/, fr/ …) gehören dazu. Draussen
+// bleiben Technik-Ordner, Fehlerseiten und alles, was laut Dateien-Zuordnung
+// gar nicht auf den Server geht (Entwurfsordner wie DE/html/…).
+function gehtAufServer (projekt, rel) {
+  const kopf = rel.split('/')[0]
+  const eintrag = (projekt.analyse?.struktur || []).find(e => e.name === kopf)
+  if (!eintrag) return true
+  return projekt.auswahl?.[kopf]?.server ?? eintrag.server
+}
+
 function seoSeitenAbgleichen (projekt, seo) {
   for (const seite of projekt.analyse?.seiten || []) {
-    if (!seite.rel.includes('/') && !seo.pages[seite.rel]) {
+    if (/^(assets|media)\//i.test(seite.rel)) continue
+    if (seite.rel.split('/').pop().toLowerCase() === '404.html') continue
+    // Nummerierte Entwürfe (01_home.html …) kommen nie auf den Server –
+    // also auch nicht in die SEO-Tabelle (gleiche Regel wie im Build).
+    if (/(^|\/)\d{1,2}[a-z]?_[^/]*\.html?$/i.test(seite.rel)) continue
+    if (!gehtAufServer(projekt, seite.rel)) continue
+    if (!seo.pages[seite.rel]) {
       seo.pages[seite.rel] = { ...leereSeite(), titel: seite.titel || '' }
     }
   }
@@ -1859,6 +1892,11 @@ vorschau.use(async (req, res, next) => {
   if (basisName.startsWith('.')
     && !/^\.[a-z0-9_-]+\.state\.json$/i.test(basisName)
     && basisName !== '.htaccess') {
+    return res.status(404).end()
+  }
+  // Versteckte ORDNER (z. B. .sitepilot/ mit Bibliothek und Seitenbuch,
+  // seit 09.10.2026 im Repo) sind nie Teil der Website.
+  if (teile.slice(0, -1).some(t => t.startsWith('.'))) {
     return res.status(404).end()
   }
   if (/(^|\/)(config\.php|[^/]*-config\.php|\.env[^/]*|[^/]*credentials[^/]*|[^/]*secret[^/]*)$/i.test(relNorm)) {

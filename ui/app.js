@@ -1980,6 +1980,29 @@ function startZeichnen (f) {
   const kopf = el('div', 'start-kopf')
   const links = el('div')
   const h1 = el('h1', null, aktuell.name)
+  // Projektname ist nur der Anzeigename – jederzeit änderbar, ohne dass
+  // Ordner, Verlauf oder Server-Ziele davon berührt werden.
+  const stift = el('button', 'btn klein', '✎ Name ändern')
+  stift.style.marginLeft = '10px'
+  stift.style.verticalAlign = 'middle'
+  stift.title = 'Anzeigename dieses Projekts ändern – alles andere bleibt, wie es ist.'
+  stift.onclick = async () => {
+    const neu = prompt('Neuer Projektname:', aktuell.name)
+    if (neu === null || !neu.trim() || neu.trim() === aktuell.name) return
+    try {
+      const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/name`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: neu.trim() }),
+      })
+      const d = await antwort.json()
+      if (!antwort.ok) throw new Error(d.fehler)
+      aktuell.name = d.name
+      status('Projekt heisst jetzt «' + d.name + '».', 'ok')
+      await projekteLaden(aktuell.id)
+    } catch (e) { status('Umbenennen fehlgeschlagen: ' + e.message, 'err') }
+  }
+  h1.appendChild(stift)
   const unter = el('div', 'unter', 'Der Weg zum Go-Live – Schritt für Schritt, bis alles grün ist.')
   links.appendChild(h1); links.appendChild(unter)
   const zahl = el('div', 'start-zahl')
