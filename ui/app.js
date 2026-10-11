@@ -2372,7 +2372,12 @@ async function bausteineLaden () {
   if (!aktuell) return
   const wahl = $('#bausteinSeite')
   wahl.innerHTML = ''
-  for (const s of (aktuell.analyse?.seiten || [])) wahl.appendChild(new Option(s.rel, s.rel))
+  // Nummerierte Entwuerfe (z. B. WordPress-Abzug 07_kontakt.html) sind keine
+  // Website-Seiten - aus ihnen duerfen keine Bausteine entstehen.
+  for (const s of (aktuell.analyse?.seiten || [])) {
+    if (/^\d{1,2}[a-z]?_/i.test(s.rel.split('/').pop())) continue
+    wahl.appendChild(new Option(s.rel, s.rel))
+  }
   if (aktuelleSeite && [...wahl.options].some(o => o.value === aktuelleSeite)) {
     wahl.value = aktuelleSeite
   }
