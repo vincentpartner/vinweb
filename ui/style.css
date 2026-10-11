@@ -653,3 +653,206 @@ select, input[type=text], input[type=password], input[type=number], input[type=d
 .ziel-label{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   color:var(--muted);margin:10px 0 4px}
 #zielFormular input{width:100%;max-width:460px;font-size:13px}
+
+/* ============================================================
+   LUFT (11.10.2026) – dasselbe Gestaltungssystem wie Sitepilot Midi
+   (Claude-Design-Handoff «Luft»). Liegt als LETZTE Schicht über
+   allem Bisherigen: legt Sitepilots Farbvariablen auf die Luft-
+   Palette um und formt die Bausteine weich, hell, ruhig – Flächen
+   in zwei Grautönen statt Rahmen, Radien 6/8/12, Public Sans.
+   Masse wie in Midi: Abstände 8·13·21·34·55, Schrift 13·15·21·34.
+   ============================================================ */
+
+:root {
+  /* Luft-Grundfarben */
+  --tinte: #1A1C21; --gedaempft: #5E636D;
+  --grund: #F1F3F5; --flaeche: #FFFFFF; --flaeche-2: #F5F6F8; --flaeche-3: #EBEDF0;
+  --linie: #E9EBEE; --linie-stark: #D5D8DD;
+  --gefahr: #B42318; --gefahr-flaeche: #FDECEA;
+  --r: 8px; --r-klein: 6px; --r-gross: 12px;
+  --schatten: 0 1px 2px rgba(20, 24, 32, .04), 0 4px 16px rgba(20, 24, 32, .05);
+  --f1: 8px; --f2: 13px; --f3: 21px; --f4: 34px; --f5: 55px;
+  --t1: 13px; --t2: 15px; --t3: 21px; --t4: 34px;
+
+  /* Sitepilots Variablen -> Luft (so greifen auch alle alten Regeln) */
+  --paper: var(--flaeche-2); --panel: var(--flaeche); --ink: var(--tinte);
+  --ink-soft: var(--gedaempft); --muted: var(--gedaempft);
+  --line: var(--linie); --line-strong: var(--linie-stark);
+  --accent: var(--tinte); --accent-ink: var(--gefahr); --accent-soft: var(--flaeche-3);
+  --err: var(--gefahr); --canvas: var(--grund);
+  --sans: "Public Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  /* Phasenfarben – je drei Rollen: Fläche (weisser Text) · Text · zarte Tönung.
+     Alle Textkombinationen >= 4.5:1. */
+  --kat-start: #1A1C21;
+  --kat-material: #5A4FCF;          --kat-material-text: #4D43B8;          --kat-material-hell: #ECEAFA;
+  --kat-pruefen: #A3245C;           --kat-pruefen-text: #8F1F50;           --kat-pruefen-hell: #FAE8EF;
+  --kat-bearbeiten: #0E7C86;        --kat-bearbeiten-text: #0B6B74;        --kat-bearbeiten-hell: #E3F3F4;
+  --kat-veroeffentlichen: #C2410C;  --kat-veroeffentlichen-text: #B03A0A;  --kat-veroeffentlichen-hell: #FBEBE3;
+  --kat-sichern: #6B5E57;           --kat-sichern-text: #5F534D;           --kat-sichern-hell: #F0ECEA;
+}
+
+body { font-family: var(--sans); font-size: 14px; line-height: 1.55; background: var(--grund); color: var(--tinte); }
+h1, h2, h3, h4 { letter-spacing: -.015em; }
+a { color: var(--tinte); }
+code { background: var(--flaeche-2); border-radius: 4px; }
+:focus-visible { outline: 2px solid var(--tinte); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 0; }
+
+/* ---------- Grundraster: Leiste frei auf dem Grund, Karten weiss ---------- */
+.app { padding: var(--f2); gap: var(--f2); }
+.navspalte { width: 233px; background: transparent; border: 0; box-shadow: none; padding: var(--f2) 0 0; }
+.inhalt, .chat { background: var(--flaeche); border: 0; border-radius: var(--r-gross); box-shadow: var(--schatten); }
+.chat { border-top: 0; }
+
+/* ---------- Identität ---------- */
+.ident { gap: 12px; padding: 0 var(--f2) var(--f3); }
+.ident .dot { width: 28px; height: 28px; border-radius: 9px; border: 0; background: var(--tinte); }
+.ident .dot::after { inset: 9px; background: var(--grund); }
+.ident b { font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+.ident small { font-size: var(--t1); letter-spacing: 0; text-transform: none; color: var(--gedaempft); }
+.navspalte > select { margin: 0 var(--f1) var(--f2) 0; background: var(--flaeche); border: 0;
+  border-radius: var(--r); box-shadow: var(--schatten); padding: 9px 12px; font-size: 14px; font-weight: 600; }
+
+/* ---------- Menü: aktiv = weisse Karte, fett, Pfeil (nicht nur Farbe) ---------- */
+.menu { padding: 0 var(--f1) 0 0; }
+.m-gruppe { font-size: var(--t1); font-weight: 500; letter-spacing: .01em; text-transform: none;
+  color: var(--gedaempft); padding: var(--f3) var(--f2) 5px; }
+.menu button, .menu.reiter button {
+  border: 0; border-radius: var(--r); padding: 9px var(--f2); margin: 1px 0; gap: 12px;
+  font-size: 14.5px; font-weight: 500; color: var(--tinte); text-transform: none; letter-spacing: 0;
+}
+.menu button::before { width: 8px; height: 8px; margin: 0; }
+.menu button:hover { background: var(--flaeche-3); color: var(--tinte); }
+.menu button.aktiv, .menu.reiter button.aktiv { background: var(--flaeche); color: var(--tinte);
+  box-shadow: var(--schatten); font-weight: 700; border: 0; }
+.menu button.aktiv::before { background: var(--kat, var(--tinte)); }
+.menu button.aktiv::after { content: "›"; margin-left: 6px; color: var(--gedaempft); font-size: 18px; line-height: 1; }
+.menu button .zahl { margin-left: auto; border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 600;
+  background: var(--flaeche-3); color: var(--gedaempft); }
+.menu button.aktiv .zahl { background: var(--kat, var(--tinte)); color: #fff; }
+.menu button[data-kat="start"] { --kat: var(--kat-start); font-weight: 600; }
+
+.nav-fuss { border-top: 0; padding: var(--f2) var(--f1) 0 0; }
+.nav-fuss .btn { background: var(--flaeche); box-shadow: var(--schatten); }
+.nav-fuss .btn:hover { background: var(--flaeche-3); }
+.nav-fuss .status { font-size: 12px; color: var(--gedaempft); }
+.status.err { color: var(--gefahr); }
+
+/* ---------- Knöpfe ---------- */
+.btn {
+  border: 1px solid transparent; border-radius: var(--r); background: var(--flaeche-2); color: var(--tinte);
+  font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; padding: 8px 14px;
+  transition: background .12s ease, color .12s ease, box-shadow .12s ease;
+}
+.btn:hover { background: var(--flaeche-3); border-color: transparent; }
+.btn.klein { font-size: var(--t1); padding: 6px 11px; }
+.btn.primary { background: var(--tinte); border-color: var(--tinte); color: var(--flaeche); }
+.btn.primary:hover { background: var(--tinte); border-color: var(--tinte); opacity: .88; }
+.btn:disabled { opacity: .5; }
+.panel[data-panel=build] .btn.primary { background: var(--kat-veroeffentlichen); border-color: var(--kat-veroeffentlichen); color: #fff; }
+.panel[data-panel=build] .btn.primary:hover { background: var(--kat-veroeffentlichen); opacity: .88; }
+.btn.laedt::after { border-color: rgba(0,0,0,.2); border-top-color: var(--tinte); }
+.btn.primary.laedt::after { border-color: rgba(255,255,255,.4); border-top-color: #fff; }
+
+/* ---------- Felder: Fläche 2, keine Rahmen; Fokus weiss mit Tinte-Rand ---------- */
+select, input[type=text], input[type=password], input[type=number], input[type=date], input[type=url],
+input[type=search], textarea {
+  font-family: inherit; font-size: 14px; color: var(--tinte); background: var(--flaeche-2);
+  border: 1px solid transparent; border-radius: var(--r); padding: 8px 11px;
+}
+select:hover { background: var(--flaeche-3); }
+select:focus, input:focus, textarea:focus { outline: none; background: var(--flaeche); border-color: var(--tinte); }
+input[type=checkbox] { accent-color: var(--tinte); }
+
+/* ---------- Kleine Beschriftungen: 13 px, gedämpft, keine Versalien ---------- */
+.block h3, .s-kopf, .tag, .tab th, .seo-profil label, .dlg label, .ziel-label, .v-gruppe h5,
+.geraet .label, .marke, .bl .wer, .chat-kat, .start-zahl span, .kachel .klein, .ablauf-legende {
+  font-size: var(--t1); font-weight: 500; letter-spacing: .01em; text-transform: none; color: var(--gedaempft);
+}
+.marke { font-size: 12px; }
+
+/* ---------- Panels, Karten, Info ---------- */
+.panel-scroll { padding: var(--f3) var(--f3) var(--f4); }
+.panel-scroll > * + * { margin-top: var(--f2); }
+.karte { border: 1px solid var(--linie); border-radius: var(--r-gross); background: var(--flaeche); }
+.karte > h4 { padding: var(--f2) var(--f3) 10px; font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--linie); }
+.karten-inhalt { padding: var(--f2) var(--f3) var(--f3); }
+.karten-hinweis { font-size: var(--t1); color: var(--gedaempft); }
+.tab-info { background: var(--flaeche-2); color: var(--gedaempft); border: 0; border-radius: var(--r);
+  margin: var(--f2) var(--f3) 0; padding: 10px var(--f2); font-size: var(--t1); }
+.hinweiskasten { background: var(--flaeche-2); border: 0; border-radius: var(--r); color: var(--gedaempft); }
+.karten-stand { border-radius: var(--r); border: 0; }
+.karten-stand.fehler { background: var(--gefahr-flaeche); color: var(--gefahr); }
+.dropzone { border: 1.5px dashed var(--linie-stark); border-radius: var(--r-gross); background: var(--flaeche-2); }
+.dropzone:hover, .dropzone.aktiv { border-color: var(--kat-material); background: var(--kat-material-hell); color: var(--kat-material-text); }
+
+/* ---------- Start: der Weg zum Go-Live ---------- */
+.start-kopf h1 { font-size: var(--t4); font-weight: 600; }
+.start-kopf .unter { color: var(--gedaempft); font-size: var(--t2); }
+.start-zahl b { font-weight: 600; }
+.ready-karte { border: 0; border-radius: var(--r-gross); background: var(--flaeche-2); }
+.ready-karte.dunkel { background: var(--tinte); }
+.ready-karte.gruen { background: var(--ok); }
+.schritt { background: var(--flaeche); border: 1px solid var(--linie); border-top: 0; }
+.schritt:first-of-type { border-top: 1px solid var(--linie); border-radius: var(--r-gross) var(--r-gross) 0 0; }
+.schritt:last-of-type { border-radius: 0 0 var(--r-gross) var(--r-gross); }
+.schritt:hover { background: var(--flaeche-2); }
+.schritt .haken { border-color: var(--linie-stark); }
+
+/* ---------- Listen, Befunde, Verlauf, Build, SEO ---------- */
+.eintrag { border-bottom: 0; border-radius: var(--r); }
+.eintrag:hover { background: var(--flaeche-2); }
+.eintrag.gewaehlt, .seitenspalte .eintrag.gewaehlt { background: var(--flaeche-3); box-shadow: none; font-weight: 600; }
+.seitenspalte { border-right: 1px solid var(--linie); }
+.befund, .stand, .build-gruppe, .vorschlag, .bau-karte, .v-stand { border: 1px solid var(--linie); border-radius: var(--r-gross); }
+.befund .kopf:hover, .vorschlag .v-kopf { background: var(--flaeche-2); }
+.befund .details, .s-details { background: var(--flaeche-2); }
+.stand.jetzt { border-color: var(--tinte); box-shadow: inset 3px 0 0 var(--tinte); }
+.build-gruppe > h4 { background: var(--flaeche-2); font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.kachel { border: 0; border-radius: var(--r-gross); background: var(--flaeche-2); }
+.kachel .gross { font-weight: 600; }
+.m-fehler { background: var(--gefahr-flaeche); color: var(--gefahr); border-color: transparent; }
+.m-warnung, .m-hinweis, .m-ok { border-color: transparent; }
+.marke, .chip, .pill, .bau-chip { border-radius: 999px; }
+.loesung { border: 0; border-left: 3px solid var(--kat-bearbeiten); border-radius: var(--r); background: var(--flaeche-2); }
+.loesung .l-prompt { border: 0; border-radius: var(--r-klein); background: var(--flaeche); }
+.warnstreifen { border-bottom: 0; }
+.verlauf-leiste, .vorschau-leiste { border-bottom: 1px solid var(--linie); }
+.tab tr:hover td { background: var(--flaeche-2); }
+.bau-mini { border: 0; border-radius: var(--r); box-shadow: var(--schatten); }
+.bau-name { border: 1px solid transparent; border-radius: var(--r); background: var(--flaeche-2); }
+.bau-name:focus { outline: none; background: var(--flaeche); border-color: var(--tinte); }
+.bau-chip.an { background: var(--kat-bearbeiten); border-color: var(--kat-bearbeiten); color: #fff; }
+.vorschlag-karte { border-left: 3px solid var(--kat-bearbeiten); }
+
+/* ---------- Vorschau ---------- */
+.buehne { background: var(--grund); border-radius: var(--r); margin: 0 var(--f2) var(--f2); }
+.geraet .rahmenbox { border: 0; border-radius: var(--r); box-shadow: var(--schatten); }
+
+/* ---------- Chat-Spalte im Luft-Stil ---------- */
+.chat-kopf, .chat-kontext, .chat-eingabe { border-color: var(--linie); }
+.chat-kat { padding: var(--f2) var(--f2) 0; }
+.chat-kat i { background: var(--kat-bearbeiten); }
+.bl.ich .txt { background: var(--tinte); color: var(--flaeche); border: 0; border-radius: 16px 16px 4px 16px; padding: 10px 14px; }
+.bl.ki .txt { background: var(--flaeche-2); border-radius: 16px 16px 16px 4px; padding: 10px 14px; }
+.bl.fehler .txt { background: var(--gefahr-flaeche); border: 0; color: var(--gefahr); border-radius: var(--r); }
+.chat-eingabe { border-top: 1px solid var(--linie); }
+.chat-eingabe textarea { border: 1px solid transparent; border-radius: var(--r); background: var(--flaeche-2); }
+.chat-eingabe textarea:focus { outline: none; background: var(--flaeche); border-color: var(--tinte); }
+.plus { border: 0; border-radius: 50%; background: var(--flaeche-2); }
+.plus:hover { background: var(--flaeche-3); color: var(--tinte); }
+.chip { background: var(--flaeche-2); border: 0; }
+.tippt::after { color: var(--tinte); }
+
+/* ---------- Dialoge ---------- */
+dialog, .v-dialog { border: 0; border-radius: var(--r-gross); box-shadow: 0 18px 60px rgba(20, 24, 32, .22); }
+dialog::backdrop, .v-overlay { background: rgba(20, 21, 24, .45); backdrop-filter: blur(4px); }
+.dlg h2 { font-weight: 600; }
+.dlg-zeile input { border: 1px solid transparent; border-radius: var(--r); background: var(--flaeche-2); }
+
+/* ---------- Laptops: schmalere Leiste, weniger Luft ---------- */
+@media (max-width: 1440px) {
+  .navspalte { width: 212px; }
+  .app { padding: var(--f1); gap: var(--f1); }
+}
