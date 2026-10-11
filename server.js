@@ -157,6 +157,9 @@ app.post('/api/import',
       }
       const ergebnis = await zipImportieren(req.body, dateiname)
       const projekt = await projektLesen(ergebnis.id)
+      // Wunschname vom «Neues Projekt»-Knopf – nur der Anzeigename.
+      const wunschName = decodeURIComponent(req.get('x-projektname') || '').trim()
+      if (wunschName) projekt.name = wunschName.slice(0, 80)
       projekt.analyse = await projektAnalysieren(ergebnis.id)
       await projektSchreiben(ergebnis.id, projekt)
       await repoAnlegen(ergebnis.id, projekt).catch(() => {})
@@ -178,6 +181,9 @@ app.post('/api/import-pfad', async (req, res) => {
     const puffer = await fs.readFile(pfad)
     const ergebnis = await zipImportieren(puffer, path.basename(pfad))
     const projekt = await projektLesen(ergebnis.id)
+    // Wunschname vom «Neues Projekt»-Knopf – nur der Anzeigename.
+    const wunschName = String(req.body?.name || '').trim()
+    if (wunschName) projekt.name = wunschName.slice(0, 80)
     projekt.analyse = await projektAnalysieren(ergebnis.id)
     await projektSchreiben(ergebnis.id, projekt)
     await repoAnlegen(ergebnis.id, projekt).catch(() => {})

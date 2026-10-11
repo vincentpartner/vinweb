@@ -574,16 +574,18 @@ function auswahlSpeichern (name, feld, wert) {
 // Import
 // ---------------------------------------------------------------------------
 
-async function zipHochladen (datei) {
+async function zipHochladen (datei, projektName) {
   banner(`«${datei.name}» wird importiert und analysiert …`, 'laeuft')
   status(`Importiere ${datei.name} (${groesse(datei.size)}) …`)
   try {
+    const kopf = {
+      'content-type': 'application/octet-stream',
+      'x-dateiname': encodeURIComponent(datei.name)
+    }
+    if (projektName) kopf['x-projektname'] = encodeURIComponent(projektName)
     const antwort = await fetch('/api/import', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/octet-stream',
-        'x-dateiname': encodeURIComponent(datei.name)
-      },
+      headers: kopf,
       body: datei
     })
     const daten = await antwort.json()
@@ -596,14 +598,14 @@ async function zipHochladen (datei) {
   }
 }
 
-async function pfadImportieren (pfad) {
+async function pfadImportieren (pfad, projektName) {
   banner('ZIP wird importiert und analysiert …', 'laeuft')
   status('Lese ' + pfad + ' …')
   try {
     const antwort = await fetch('/api/import-pfad', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pfad })
+      body: JSON.stringify({ pfad, name: projektName || '' })
     })
     const daten = await antwort.json()
     if (!antwort.ok) throw new Error(daten.fehler || 'Import fehlgeschlagen.')
@@ -654,6 +656,59 @@ function importOderVergleich (datei, pfad) {
   overlay.appendChild(dialog)
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
   document.body.appendChild(overlay)
+}
+
+// «+ Neues Projekt anlegen»: der bewusste, sichere Weg – was hier gewählt
+// wird, legt IMMER ein neues Projekt an und berührt das offene nie.
+$('#btnNeuesProjekt').onclick = () => {
+  const overlay = el('div', 'v-overlay')
+  const dialog = el('div', 'v-dialog')
+  dialog.appendChild(el('div', 'vd-kopf', 'Neues Projekt anlegen'))
+  const inhalt = el('div', 'vd-inhalt')
+  const hinweis = el('p', 'karten-hinweis')
+  hinweis.style.fontSize = '13px'
+  hinweis.textContent = 'Alles, was du hier wählst, wird garantiert ein NEUES Projekt – '
+    + (aktuell ? `«${aktuell.name}» bleibt unberührt.` : 'bestehende Projekte bleiben unberührt.')
+  inhalt.appendChild(hinweis)
+  const nameFeld = el('input')
+  nameFeld.type = 'text'
+  nameFeld.placeholder = 'Projektname (leer = Name aus dem ZIP)'
+  nameFeld.style.cssText = 'width:100%;margin:6px 0 10px'
+  inhalt.appendChild(nameFeld)
+  const pfadFeld = el('input')
+  pfadFeld.type = 'text'
+  pfadFeld.placeholder = 'oder Pfad einfügen: ~/Downloads/....zip'
+  pfadFeld.style.cssText = 'width:100%;margin:0 0 4px'
+  dialog.appendChild(inhalt)
+
+  const fuss = el('div', 'vd-fuss')
+  const waehlen = el('button', 'btn klein primary', 'ZIP wählen …')
+  waehlen.onclick = () => {
+    const w = document.createElement('input')
+    w.type = 'file'; w.accept = '.zip'
+    w.onchange = () => {
+      if (!w.files[0]) return
+      overlay.remove()
+      zipHochladen(w.files[0], nameFeld.value.trim())
+    }
+    w.click()
+  }
+  const laden = el('button', 'btn klein', 'Pfad laden')
+  laden.onclick = () => {
+    const p = pfadFeld.value.trim()
+    if (!p) { pfadFeld.focus(); return }
+    overlay.remove()
+    pfadImportieren(p, nameFeld.value.trim())
+  }
+  const abbruch = el('button', 'btn klein', 'Abbrechen')
+  abbruch.onclick = () => overlay.remove()
+  inhalt.appendChild(pfadFeld)
+  fuss.appendChild(waehlen); fuss.appendChild(laden); fuss.appendChild(abbruch)
+  dialog.appendChild(fuss)
+  overlay.appendChild(dialog)
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
+  document.body.appendChild(overlay)
+  nameFeld.focus()
 }
 
 const zone = $('#dropzone')
