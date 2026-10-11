@@ -40,6 +40,8 @@
       <button data-reiter="seo" data-kat="bearbeiten">SEO</button>
       <button data-reiter="bausteine" data-kat="bearbeiten"
         title="Design-Bausteine f&uuml;r Sitepilot Midi ernten und freigeben">Bausteine <span class="zahl" id="bausteinzahl" hidden>0</span></button>
+      <button data-reiter="seitentypen" data-kat="bearbeiten"
+        title="Wo erscheinen neue Kundenseiten aus Midi automatisch? (Aktuelles, Dienstleistung, Kampagnenseite)">Seitentypen</button>
 
       <div class="m-gruppe">Ver&ouml;ffentlichen</div>
       <button data-reiter="build" data-kat="veroeffentlichen">Build</button>
@@ -359,6 +361,23 @@
       </div>
     </section>
     <!-- Bausteine (fuer Sitepilot Midi) -->
+    <section class="panel" data-panel="seitentypen">
+      <div class="panel-scroll">
+        <div class="tab-info">
+          <b>Wo erscheinen neue Kundenseiten?</b>
+          Legt der Kunde in Midi eine neue Seite an, w&auml;hlt er nur den Typ. Midi tr&auml;gt sie
+          dann &uuml;berall ein, wo die <b>Musterseite</b> des Typs als Listeneintrag verlinkt ist
+          &ndash; im Dropdown, im Handy-Men&uuml;, im Footer, in der &Uuml;bersicht &ndash; und zwar in allen Seiten.
+          Hauptmen&uuml;punkte legt nur die Agentur an.
+        </div>
+        <div id="seitentypenListe"></div>
+        <div class="werkzeugzeile">
+          <button class="btn primary" id="btnSeitentypenSpeichern">Speichern</button>
+          <span class="titel" id="seitentypenStatus"></span>
+        </div>
+      </div>
+    </section>
+
     <section class="panel" data-panel="bausteine">
       <div class="panel-scroll">
         <div class="tab-info">

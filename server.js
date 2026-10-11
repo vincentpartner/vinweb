@@ -36,6 +36,7 @@ import {
   fernAbgleichen, fernHochladen, fernUebernehmen,
 } from './lib/git.js'
 import { sektionenErnten, bibliothekLesen, bibliothekSchreiben, ETIKETTEN } from './lib/bausteine.js'
+import { seitentypenLesen, seitentypenSchreiben, musterPruefen } from './lib/seitentypen.js'
 
 // ---------------------------------------------------------------------------
 // 1) Oberfläche und Schnittstelle
@@ -1371,6 +1372,11 @@ app.post('/api/projekte/:id/build', (req, res) => nacheinander(req.params.id, as
   try {
     const projekt = await projektLesen(req.params.id)
     if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    // Vor jedem Build frisch analysieren: Seiten, die der Kunde in Midi
+    // angelegt hat (und der Ordner teilen/), stehen sonst nicht in der
+    // Analyse - der Build liesse sie stillschweigend weg. Die Wahl der
+    // Agentur (projekt.auswahl) bleibt davon unberuehrt.
+    projekt.analyse = await projektAnalysieren(req.params.id)
     const bericht = await buildErzeugen(projekt)
     // Nach dem Bauen: SEO in den Build schreiben (nie in die Quelle).
     if (projekt.seo) {
@@ -1402,6 +1408,51 @@ app.get('/api/projekte/:id/build', async (req, res) => {
 // sie hier und gibt sie frei. Ergebnis: bibliothek.json im Projektordner -
 // daraus komponiert Sitepilot Midi spaeter neue Unterseiten (KI waehlt nur
 // Bausteine, schreibt nie eigenes HTML).
+
+// ---------------------------------------------------------------------------
+// Seitentypen fuer Midi (Etappe 5): wo neue Kundenseiten automatisch erscheinen
+// ---------------------------------------------------------------------------
+
+// Die Website-Seiten fuer die Musterwahl (ohne nummerierte Entwuerfe).
+// Immer FRISCH analysiert (Astra-Fund 11.10.): neue Midi-Seiten muessen in
+// der Pruefung mitzaehlen, sonst zeigt das Panel weniger Stellen als Midi.
+async function seitenFuerTypen (id) {
+  const analyse = await projektAnalysieren(id)
+  return (analyse?.seiten || []).map(x => x.rel)
+    .filter(r => /\.html?$/i.test(r) && !/^\d{1,2}[a-z]?_/i.test(r.split('/').pop()))
+}
+
+app.get('/api/projekte/:id/seitentypen', async (req, res) => {
+  try {
+    res.json({ typen: await seitentypenLesen(req.params.id), seiten: await seitenFuerTypen(req.params.id) })
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+})
+
+app.post('/api/projekte/:id/seitentypen/pruefen', async (req, res) => {
+  try {
+    const seiten = await seitenFuerTypen(req.params.id)
+    const muster = String(req.body?.muster || '')
+    if (!seiten.includes(muster)) return res.status(400).json({ fehler: 'Bitte eine Musterseite wählen.' })
+    res.json(await musterPruefen(req.params.id, muster, seiten))
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+})
+
+app.put('/api/projekte/:id/seitentypen', (req, res) => nacheinander(req.params.id, async () => {
+  try {
+    await seitentypenSchreiben(req.params.id, req.body?.typen, await seitenFuerTypen(req.params.id))
+    // Als eigener Agentur-Stand sichern: Sonst landet die Vorlagen-Aenderung
+    // in mini.json im naechsten Kunden-Eintrag, und dessen «Rueckgaengig»
+    // naehme sie wieder weg (Astra-Fund 11.10.).
+    if (await istRepo(req.params.id)) await sichern(req.params.id, 'Seitentypen eingerichtet')
+    res.json({ ok: true, typen: await seitentypenLesen(req.params.id) })
+  } catch (e) {
+    res.status(400).json({ fehler: e.message })
+  }
+}))
 
 // Die Bibliothek samt Etiketten-Vokabular lesen.
 app.get('/api/projekte/:id/bausteine', async (req, res) => {

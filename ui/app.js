@@ -713,6 +713,7 @@ for (const knopf of document.querySelectorAll('.reiter button')) {
     if (knopf.dataset.reiter === 'seo') seoLaden()
     if (knopf.dataset.reiter === 'endpruefung') pruefungLaden()
     if (knopf.dataset.reiter === 'bausteine') bausteineLaden()
+    if (knopf.dataset.reiter === 'seitentypen') seitentypenLaden()
   }
 }
 
@@ -2954,4 +2955,142 @@ $('#btnStaging').onclick = async () => {
     knopf.disabled = false
     knopf.textContent = 'Auf Testserver stellen'
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Seitentypen fuer Midi (Etappe 5): pro Typ eine Musterseite. Ueberall, wo
+// sie als Listeneintrag verlinkt ist, traegt Midi neue Seiten dieses Typs ein.
+// ---------------------------------------------------------------------------
+
+const TYP_TEXT = {
+  aktuelles: 'Neue Meldungen erscheinen als Karte in der Übersicht – nach Datum, neuste zuerst. Musterseite: eine bestehende Meldung, deren Karte in der Übersicht steht.',
+  leistung: 'Neue Dienstleistungen erscheinen als Unterpunkt im Menü (Desktop + Handy), im Footer und in der Übersicht. Musterseite: eine bestehende Dienstleistung.',
+  landingpage: 'Kampagnenseiten werden nur im Footer verlinkt (ideal für Werbung mit Direktlink). Musterseite: eine Seite, die im Footer in der gewünschten Liste steht.',
+}
+const BEREICH_TEXT = { navigation: 'Menü', footer: 'Footer', inhalt: 'Übersicht / Kacheln' }
+
+function seitentypApi (zusatz = '') {
+  return '/api/projekte/' + encodeURIComponent(aktuell.id) + '/seitentypen' + zusatz
+}
+
+async function seitentypenLaden () {
+  if (!aktuell) return
+  const projekt = aktuell.id
+  const box = $('#seitentypenListe')
+  box.innerHTML = ''
+  box.dataset.projekt = ''
+  $('#seitentypenStatus').textContent = ''
+  let d
+  try { d = await (await fetch(seitentypApi())).json() } catch (e) { d = { fehler: e.message } }
+  // Inzwischen ein anderes Projekt gewaehlt? Dann diese Antwort verwerfen
+  // (Astra-Fund 11.10.: sonst mischten sich die Karten zweier Projekte).
+  if (aktuell?.id !== projekt) return
+  box.innerHTML = ''
+  if (d.fehler) { $('#seitentypenStatus').textContent = d.fehler; return }
+  for (const t of d.typen) box.appendChild(seitentypKarte(t, d.seiten))
+  box.dataset.projekt = projekt
+}
+
+function seitentypKarte (t, seiten) {
+  const karte = document.createElement('div')
+  karte.className = 'karte seitentyp'
+  karte.dataset.typ = t.id
+  const h = document.createElement('h4')
+  h.textContent = t.name
+  karte.appendChild(h)
+  const innen = document.createElement('div')
+  innen.className = 'karten-inhalt'
+  innen.innerHTML = ''
+  const erkl = document.createElement('p')
+  erkl.className = 'karten-hinweis'
+  erkl.style.marginTop = '0'
+  erkl.textContent = TYP_TEXT[t.id] || ''
+  innen.appendChild(erkl)
+
+  const zeile = document.createElement('div')
+  zeile.className = 'werkzeugzeile'
+  zeile.style.marginTop = '10px'
+  const aktiv = document.createElement('label')
+  aktiv.className = 'werkzeug-label'
+  aktiv.innerHTML = '<input type="checkbox" data-feld="aktiv"> In Midi anbieten'
+  aktiv.querySelector('input').checked = t.aktiv
+  const wahl = document.createElement('select')
+  wahl.dataset.feld = 'muster'
+  wahl.style.maxWidth = '320px'
+  wahl.appendChild(new Option('– Musterseite wählen –', ''))
+  for (const s of seiten) wahl.appendChild(new Option(s, s))
+  wahl.value = t.muster || ''
+  zeile.append(aktiv, wahl)
+  innen.appendChild(zeile)
+
+  const zeile2 = document.createElement('div')
+  zeile2.className = 'werkzeugzeile'
+  zeile2.style.marginTop = '8px'
+  for (const b of ['navigation', 'footer', 'inhalt']) {
+    const l = document.createElement('label')
+    l.className = 'werkzeug-label'
+    l.innerHTML = '<input type="checkbox" data-bereich="' + b + '"> ' + BEREICH_TEXT[b]
+    l.querySelector('input').checked = t.bereiche.includes(b)
+    zeile2.appendChild(l)
+  }
+  const max = document.createElement('label')
+  max.className = 'werkzeug-label'
+  max.innerHTML = 'höchstens <input type="number" min="1" max="99" data-feld="max" style="width:64px"> pro Liste'
+  max.querySelector('input').value = t.max || ''
+  const vorlage = document.createElement('label')
+  vorlage.className = 'werkzeug-label'
+  vorlage.innerHTML = '<input type="checkbox" data-feld="alsVorlage"> auch als Vorlage für «Aus Vorlage kopieren»'
+  vorlage.querySelector('input').checked = t.alsVorlage
+  zeile2.append(max, vorlage)
+  innen.appendChild(zeile2)
+
+  const befund = document.createElement('div')
+  befund.className = 'karten-stand'
+  befund.hidden = true
+  innen.appendChild(befund)
+  karte.appendChild(innen)
+
+  const pruefen = async () => {
+    if (!wahl.value) { befund.hidden = true; return }
+    befund.hidden = false
+    befund.className = 'karten-stand laeuft'
+    befund.textContent = 'Prüfe, wo die Musterseite gelistet ist …'
+    const r = await (await fetch(seitentypApi('/pruefen'), {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ muster: wahl.value }),
+    })).json()
+    if (r.fehler) { befund.className = 'karten-stand fehler'; befund.textContent = r.fehler; return }
+    const teile = Object.entries(r.proBereich).filter(([, n]) => n).map(([b, n]) => BEREICH_TEXT[b] + ': ' + n + ' Liste(n)')
+    const gewaehlt = [...zeile2.querySelectorAll('[data-bereich]')].filter(x => x.checked).map(x => x.dataset.bereich)
+    const treffer = gewaehlt.reduce((a, b) => a + (r.proBereich[b] || 0), 0)
+    befund.className = 'karten-stand' + (treffer ? '' : ' fehler')
+    befund.textContent = (teile.length ? 'Gefunden in ' + r.seitenMit + ' Seiten – ' + teile.join(' · ') : 'Die Musterseite steht in keiner Liste.')
+      + (r.hauptmenue ? ' · Hauptmenü wird bewusst ausgelassen (nur Agentur).' : '')
+      + (treffer ? '' : ' → In den gewählten Bereichen würde nichts eingetragen.')
+      + (r.beispiele.length ? '\nBeispiele: ' + r.beispiele.map(b => '«' + b.text.slice(0, 50) + '» (' + BEREICH_TEXT[b.bereich] + ')').join(' · ') : '')
+    befund.style.whiteSpace = 'pre-line'
+  }
+  wahl.onchange = pruefen
+  zeile2.querySelectorAll('[data-bereich]').forEach(x => { x.onchange = pruefen })
+  if (t.muster) pruefen()
+  return karte
+}
+
+$('#btnSeitentypenSpeichern').onclick = async () => {
+  if ($('#seitentypenListe').dataset.projekt !== aktuell?.id) {
+    $('#seitentypenStatus').textContent = 'Bitte kurz warten – die Seitentypen werden noch geladen.'
+    return
+  }
+  const typen = [...document.querySelectorAll('#seitentypenListe .seitentyp')].map(k => ({
+    id: k.dataset.typ,
+    aktiv: k.querySelector('[data-feld="aktiv"]').checked,
+    muster: k.querySelector('[data-feld="muster"]').value,
+    bereiche: [...k.querySelectorAll('[data-bereich]')].filter(x => x.checked).map(x => x.dataset.bereich),
+    max: parseInt(k.querySelector('[data-feld="max"]').value, 10) || null,
+    alsVorlage: k.querySelector('[data-feld="alsVorlage"]').checked,
+  }))
+  const r = await (await fetch(seitentypApi(), {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ typen }),
+  })).json()
+  $('#seitentypenStatus').textContent = r.fehler ? r.fehler : '✓ Gespeichert – Midi bietet die aktiven Typen ab sofort an.'
 }
