@@ -2936,6 +2936,7 @@ async function zielFormularFuellen () {
   $('#zielUrl').value = d.stagingUrl || ''
   $('#zielLivePfad').value = d.live || ''
   $('#zielLiveUrl').value = d.liveUrl || ''
+  zielFreiPruefen()   // falls das gespeicherte Ziel inzwischen belegt ist
   if (!$('#zielHost').value) {
     try {
       const v = await (await fetch('/api/deploy-vorschlag')).json()
@@ -2949,6 +2950,37 @@ function zielStand (text, art) {
   z.hidden = false
   z.className = 'karten-stand' + (art ? ' ' + art : '')
   z.textContent = text
+}
+
+// Doppelte Ziele schon beim TIPPEN melden, nicht erst beim Speichern:
+// Gehört der eingetippte Ordner einem anderen Projekt, erscheint sofort
+// eine Warnung (gespeichert wird so ein Ziel ohnehin nicht – doppelter Schutz).
+let zielPruefTimer = null
+function zielFreiPruefen () {
+  clearTimeout(zielPruefTimer)
+  zielPruefTimer = setTimeout(async () => {
+    if (!aktuell) return
+    const host = $('#zielHost').value.trim()
+    const felder = [
+      [$('#zielPfad').value.trim(), 'Testserver-Ordner'],
+      [$('#zielLivePfad').value.trim(), 'Live-Ordner'],
+    ]
+    const warnungen = []
+    for (const [pfad, etikett] of felder) {
+      if (!host || !pfad) continue
+      try {
+        const d = await (await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/ziel-frei`
+          + `?host=${encodeURIComponent(host)}&pfad=${encodeURIComponent(pfad)}`)).json()
+        if (d.belegt) warnungen.push(`⚠ ${etikett} «${pfad}» gehört bereits dem Projekt «${d.belegt.name}» (${d.belegt.art}) – bitte einen eigenen Ordner wählen.`)
+      } catch { /* Warnung ist Komfort – Speichern bleibt trotzdem gesperrt */ }
+    }
+    const w = $('#zielWarnung')
+    w.hidden = warnungen.length === 0
+    w.textContent = warnungen.join(' ')
+  }, 400)
+}
+for (const feld of ['zielHost', 'zielPfad', 'zielLivePfad']) {
+  $('#' + feld).addEventListener('input', zielFreiPruefen)
 }
 
 $('#btnZielAendern').onclick = () => {

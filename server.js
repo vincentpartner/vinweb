@@ -956,6 +956,18 @@ app.get('/api/deploy-vorschlag', async (req, res) => {
 function zielPfadNormieren (p) {
   return serverPfad(String(p || '')).replace(/^\/home\/[^/]+\//, '').replace(/^\/+/, '').replace(/\/+$/, '')
 }
+// Live-Prüfung fürs Formular: Ist dieser Ordner noch frei? Warnt schon
+// beim Tippen, nicht erst beim Speichern.
+app.get('/api/projekte/:id/ziel-frei', async (req, res) => {
+  try {
+    const belegt = await zielBelegtVon(req.params.id, String(req.query.host || '').trim(),
+      String(req.query.pfad || '').trim())
+    res.json({ belegt })
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
+})
+
 async function zielBelegtVon (eigeneId, host, pfad) {
   if (!host || !pfad) return null
   const gesucht = zielPfadNormieren(pfad)
