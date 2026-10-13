@@ -949,6 +949,26 @@ app.get('/api/deploy-vorschlag', async (req, res) => {
   res.json({ host: '' })
 })
 
+// Zwei Projekte dürfen NIE auf denselben Server-Ordner zeigen – sonst
+// überschreibt «Auf Testserver stellen» die Website des anderen Projekts
+// (GZH/Mueller-Vorfall 13.10.). Pfade werden normiert verglichen, damit
+// «home/zojegozo/public_html/x» und «public_html/x» als gleich erkannt werden.
+function zielPfadNormieren (p) {
+  return serverPfad(String(p || '')).replace(/^\/home\/[^/]+\//, '').replace(/^\/+/, '').replace(/\/+$/, '')
+}
+async function zielBelegtVon (eigeneId, host, pfad) {
+  if (!host || !pfad) return null
+  const gesucht = zielPfadNormieren(pfad)
+  for (const p of await projekteAuflisten()) {
+    if (p.id === eigeneId) continue
+    const d = p.deploy || {}
+    if (d.host !== host) continue
+    if (d.staging && zielPfadNormieren(d.staging) === gesucht) return { name: p.name, art: 'Testserver' }
+    if (d.live && zielPfadNormieren(d.live) === gesucht) return { name: p.name, art: 'Live-Ziel' }
+  }
+  return null
+}
+
 app.put('/api/projekte/:id/deploy-ziel', async (req, res) => {
   try {
     const projekt = await projektLesen(req.params.id)
@@ -975,6 +995,15 @@ app.put('/api/projekte/:id/deploy-ziel', async (req, res) => {
     let lUrl = String(liveUrl || '').trim()
     if (lUrl && !/^https?:[/][/][a-z0-9.-]+/i.test(lUrl)) {
       return res.status(400).json({ fehler: 'Die Live-Adresse muss mit http:// oder https:// beginnen.' })
+    }
+    // Ziel darf keinem anderen Projekt gehören – sonst überschreiben sich
+    // die Websites gegenseitig.
+    for (const [pfadWert, etikett] of [[staging, 'Server-Ordner'], [livePfad, 'Live-Ordner']]) {
+      if (!pfadWert) continue
+      const belegt = await zielBelegtVon(req.params.id, String(host).trim(), pfadWert)
+      if (belegt) {
+        return res.status(400).json({ fehler: `${etikett} abgelehnt: Dieser Ordner gehört bereits dem Projekt «${belegt.name}» (${belegt.art}). Jedes Projekt braucht seinen eigenen Server-Ordner – sonst überschreiben sich die Websites gegenseitig.` })
+      }
     }
     projekt.deploy = {
       ...(projekt.deploy || {}),
@@ -1022,6 +1051,10 @@ app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander(req.para
   try {
     const projekt = await projektLesen(req.params.id)
     if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    const belegt = await zielBelegtVon(req.params.id, projekt.deploy?.host, projekt.deploy?.staging)
+    if (belegt) {
+      return res.status(409).json({ fehler: `Gestoppt: Der Server-Ordner dieses Projekts gehört bereits dem Projekt «${belegt.name}» (${belegt.art}) – die Übertragung hätte dessen Website überschrieben. Bitte unter «Ziel ändern» einen eigenen Ordner eintragen.` })
+    }
     const meldungen = []
     // Immer frisch bauen - damit kann NIE ein alter Stand hochgehen, und der
     // Merksatz «erst Build, dann Staging» entfaellt ersatzlos.
@@ -1056,6 +1089,10 @@ app.post('/api/projekte/:id/deploy/live', (req, res) => nacheinander(req.params.
     if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
     if (!projekt.deploy?.host || !projekt.deploy?.live) {
       return res.status(400).json({ fehler: 'Kein Live-Ziel eingerichtet – im Reiter Build unter «Ziel ändern» den Live-Ordner eintragen.' })
+    }
+    const belegt = await zielBelegtVon(req.params.id, projekt.deploy.host, projekt.deploy.live)
+    if (belegt) {
+      return res.status(409).json({ fehler: `Gestoppt: Das Live-Ziel gehört bereits dem Projekt «${belegt.name}» (${belegt.art}) – der Livegang hätte dessen Website überschrieben. Bitte unter «Ziel ändern» einen eigenen Ordner eintragen.` })
     }
 
     // Erst offene Änderungen sichern, DANN messen: so fällt jede noch nicht
