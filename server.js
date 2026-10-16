@@ -64,7 +64,14 @@ const app = express()
 // Browser-Herkunft (curl, eigene Werkzeuge) oder aus der eigenen Oberfläche
 // an. Ein Skript aus der VORSCHAU (Port 4401 = fremde Herkunft) kann damit
 // keine Builds, Deploys oder Löschungen mehr auslösen.
+// Astra-Fund 15 (16.10.): Host-Prüfung gegen DNS-Rebinding – eine fremde
+// Website könnte sonst einen Domainnamen auf 127.0.0.1 zeigen lassen und
+// lesend auf die Verwaltung zugreifen. Erwartet sind NUR Loopback-Namen.
+function hostErlaubt (req) {
+  return /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(String(req.get('host') || ''))
+}
 app.use((req, res, next) => {
+  if (!hostErlaubt(req)) return res.status(403).json({ fehler: 'Unerwarteter Host.' })
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
   const herkunft = req.get('origin')
   if (!herkunft) return next()
@@ -98,12 +105,16 @@ app.get('/api/projekte', async (req, res) => {
 
 // Ein Projekt samt Analyse
 app.get('/api/projekte/:id', async (req, res) => {
-  const projekt = await projektLesen(req.params.id)
-  if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
-  // Nur nachsehen, nichts verändern – ein Aufruf zum Lesen darf nichts schreiben.
-  projekt.verlaufAktiv = await istRepo(req.params.id)
-  projekt.ungesichert = projekt.verlaufAktiv ? await hatAenderungen(req.params.id) : false
-  res.json(projekt)
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    // Nur nachsehen, nichts verändern – ein Aufruf zum Lesen darf nichts schreiben.
+    projekt.verlaufAktiv = await istRepo(req.params.id)
+    projekt.ungesichert = projekt.verlaufAktiv ? await hatAenderungen(req.params.id) : false
+    res.json(projekt)
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
 })
 
 // Analyse neu berechnen
@@ -312,11 +323,13 @@ app.post('/api/chat', async (req, res) => {
 
     // Text-Anhänge kommen als Text mit, Bilder als Bild.
     const bilder = []
+    const bildNamen = []
     const textAnhaenge = []
     for (const a of anhaenge) {
       if (!a?.base64) continue
       if (/^image\//.test(a.mediaType) && a.mediaType !== 'image/svg+xml') {
         bilder.push({ mediaType: a.mediaType, base64: a.base64 })
+        bildNamen.push(a.name || `bild-${bilder.length}.jpg`)
       } else {
         const roh = Buffer.from(a.base64, 'base64').toString('utf8').slice(0, 120000)
         textAnhaenge.push(`--- ANGEHÄNGTE DATEI ${a.name} ---\n${roh}`)
@@ -324,9 +337,12 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const kontext = await kontextBauen(projekt, kontextSeiten)
+    // Astra-Fund 52 (16.10.): Die KI braucht die ECHTEN Dateinamen – sonst
+    // erfindet sie welche, und die Verweise zeigen nach dem Übernehmen ins Leere.
     const hinweisBilder = bilder.length
-      ? `\n\nEs sind ${bilder.length} Bild(er) angehängt. Beim Übernehmen werden sie unter `
-        + `assets/upload/<Dateiname> abgelegt – verweise im HTML auf genau diesen Pfad.`
+      ? `\n\nEs sind ${bilder.length} Bild(er) angehängt. Beim Übernehmen werden sie unter genau `
+        + `diesen Pfaden abgelegt – verweise im HTML exakt darauf:\n`
+        + bildNamen.map(n => `  assets/upload/${n}`).join('\n')
       : ''
 
     // Nur die letzten Runden mitschicken – ein endlos wachsender Verlauf macht
@@ -968,6 +984,11 @@ app.get('/api/projekte/:id/ziel-frei', async (req, res) => {
   }
 })
 
+// Astra-Fund 8 (16.10.): Auch ÜBERLAPPUNG zählt als belegt – ein Deploy
+// nach public_html/a löscht per --delete auch public_html/a/b.
+function pfadUeberlappt (a, b) {
+  return a === b || a.startsWith(b + '/') || b.startsWith(a + '/')
+}
 async function zielBelegtVon (eigeneId, host, pfad) {
   if (!host || !pfad) return null
   const gesucht = zielPfadNormieren(pfad)
@@ -975,8 +996,8 @@ async function zielBelegtVon (eigeneId, host, pfad) {
     if (p.id === eigeneId) continue
     const d = p.deploy || {}
     if (d.host !== host) continue
-    if (d.staging && zielPfadNormieren(d.staging) === gesucht) return { name: p.name, art: 'Testserver' }
-    if (d.live && zielPfadNormieren(d.live) === gesucht) return { name: p.name, art: 'Live-Ziel' }
+    if (d.staging && pfadUeberlappt(zielPfadNormieren(d.staging), gesucht)) return { name: p.name, art: 'Testserver' }
+    if (d.live && pfadUeberlappt(zielPfadNormieren(d.live), gesucht)) return { name: p.name, art: 'Live-Ziel' }
   }
   return null
 }
@@ -1001,8 +1022,8 @@ app.put('/api/projekte/:id/deploy-ziel', async (req, res) => {
     if (livePfad && !pfadGueltig(livePfad)) {
       return res.status(400).json({ fehler: 'Live-Ordner bitte relativ angeben, z. B. public_html/example.ch – ohne führenden Schrägstrich, ohne «..».' })
     }
-    if (livePfad && livePfad === String(staging).trim().replace(/[/]+$/, '')) {
-      return res.status(400).json({ fehler: 'Live-Ordner und Testserver-Ordner dürfen nicht derselbe sein – sonst überschreibt der nächste Test-Deploy die Live-Website mit der Suchmaschinen-Sperre.' })
+    if (livePfad && pfadUeberlappt(zielPfadNormieren(livePfad), zielPfadNormieren(staging))) {
+      return res.status(400).json({ fehler: 'Live-Ordner und Testserver-Ordner dürfen weder gleich sein noch ineinander liegen – sonst überschreibt der nächste Test-Deploy die Live-Website mit der Suchmaschinen-Sperre.' })
     }
     let lUrl = String(liveUrl || '').trim()
     if (lUrl && !/^https?:[/][/][a-z0-9.-]+/i.test(lUrl)) {
@@ -1070,6 +1091,11 @@ app.post('/api/projekte/:id/deploy/staging', (req, res) => nacheinander(req.para
     const meldungen = []
     // Immer frisch bauen - damit kann NIE ein alter Stand hochgehen, und der
     // Merksatz «erst Build, dann Staging» entfaellt ersatzlos.
+    // Astra-Fund 12 (16.10.): Vorher die Analyse auffrischen – sie liefert
+    // die Server-Auswahl und die Geheimnis-Sperrliste. Mit veralteter Analyse
+    // könnten neue Dateien fehlen oder neue Zugangsdaten hochgehen.
+    meldungen.push('Aktualisiere die Projekt-Analyse …')
+    projekt.analyse = await projektAnalysieren(req.params.id)
     meldungen.push('Erzeuge frischen Build …')
     const buildBericht = await buildErzeugen(projekt)
     if (projekt.seo) buildBericht.seo = await seoAnwenden(projekt.seo, buildPfad(req.params.id))
@@ -1181,8 +1207,10 @@ app.post('/api/projekte/:id/endpruefung', async (req, res) => {
     if (!anbieter || !modell) throw new Error('Bitte zuerst Anbieter und Modell wählen (rechts in der KI-Spalte).')
 
     // Review-Fund 20: Verbindung weg -> Prüfung und KI-Aufrufe sofort stoppen.
+    // Astra-Fund 34 (16.10.): auf res.close hören – req.close kann schon nach
+    // dem Einlesen des Bodys feuern und würde sofort fälschlich abbrechen.
     const abbruch = new AbortController()
-    req.on('close', () => { if (!res.writableEnded) abbruch.abort() })
+    res.on('close', () => { if (!res.writableEnded) abbruch.abort() })
     const bericht = await nacheinander(req.params.id, () =>
       endpruefungLaufen({ projekt, anbieter, modell, signal: abbruch.signal, onMeldung: (t) => { if (!res.writableEnded) senden('meldung', { t }) } }))
     if (abbruch.signal.aborted) return res.end()
@@ -1286,9 +1314,13 @@ function seoSeitenAbgleichen (projekt, seo) {
 }
 
 app.get('/api/projekte/:id/seo', async (req, res) => {
-  const projekt = await projektLesen(req.params.id)
-  if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
-  res.json(seoSeitenAbgleichen(projekt, projekt.seo || leeresSeo()))
+  try {
+    const projekt = await projektLesen(req.params.id)
+    if (!projekt) return res.status(404).json({ fehler: 'Projekt nicht gefunden.' })
+    res.json(seoSeitenAbgleichen(projekt, projekt.seo || leeresSeo()))
+  } catch (e) {
+    res.status(500).json({ fehler: e.message })
+  }
 })
 
 app.put('/api/projekte/:id/seo', async (req, res) => {
@@ -1383,9 +1415,14 @@ app.post('/api/projekte/:id/seo/ki-fuellen', async (req, res) => {
     res.on('close', () => { if (!res.writableEnded) { abgebrochen = true; abbruchSeo.abort() } })
     for (const [datei, p] of offen) {
       if (abgebrochen) break   // Browser weg -> keine weiteren Aufrufe bezahlen
+      // Astra-Fund 6 (16.10.): Seitenschlüssel können aus SiteSett-Importen
+      // stammen – nur echte HTML-Seiten INNERHALB des Projekts lesen, sonst
+      // könnte ein präparierter Eintrag beliebige lokale Dateien an die KI geben.
+      const voll = path.resolve(wurzel, datei)
+      if (!voll.startsWith(path.resolve(wurzel) + path.sep) || !/\.html?$/i.test(datei)) continue
       let inhalt = ''
       try {
-        inhalt = (await fs.readFile(path.join(wurzel, datei), 'utf8'))
+        inhalt = (await fs.readFile(voll, 'utf8'))
           .replace(/<script[\s\S]*?<\/script>/gi, ' ')
           .replace(/<style[\s\S]*?<\/style>/gi, ' ')
           .replace(/<[^>]+>/g, ' ')
@@ -1644,6 +1681,14 @@ if (AUTO_SICHERN_SEKUNDEN > 0) {
 // ---------------------------------------------------------------------------
 
 const vorschau = express()
+
+// Astra-Fund 15 (16.10.): auch die Vorschau nur über Loopback-Namen ansprechen.
+vorschau.use((req, res, next) => {
+  if (!/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(String(req.get('host') || ''))) {
+    return res.status(403).type('text/plain; charset=utf-8').send('Unerwarteter Host.')
+  }
+  next()
+})
 
 // ---------------------------------------------------------------------------
 // Editor-Brücke: macht die eingebauten Klick-Editoren (Bild anklicken ->
@@ -2006,6 +2051,11 @@ vorschau.use(async (req, res, next) => {
     return res.status(404).end()
   }
   if (/(^|\/)(config\.php|[^/]*-config\.php|\.env[^/]*|[^/]*credentials[^/]*|[^/]*secret[^/]*)$/i.test(relNorm)) {
+    return res.status(404).end()
+  }
+  // Astra-Fund 4 (16.10.): dieselbe Namenssperre wie überall sonst –
+  // id_rsa, *token*.json & Co. haben in der Vorschau nichts verloren.
+  if (GEHEIM_DATEINAME.test(basisName)) {
     return res.status(404).end()
   }
   if (/\.php$/i.test(relNorm)) {
