@@ -561,12 +561,18 @@ function auswahlSpeichern (name, feld, wert) {
 
   clearTimeout(speicherTimer)
   speicherTimer = setTimeout(async () => {
-    await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/auswahl`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ auswahl: aktuell.auswahl })
-    })
-    status('Auswahl gespeichert.', 'ok')
+    // Astra-Fund 32 (16.10.): «gespeichert» nur sagen, wenn es stimmt.
+    try {
+      const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/auswahl`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ auswahl: aktuell.auswahl })
+      })
+      if (!antwort.ok) throw new Error((await antwort.json().catch(() => ({}))).fehler || 'HTTP ' + antwort.status)
+      status('Auswahl gespeichert.', 'ok')
+    } catch (e) {
+      status('Auswahl NICHT gespeichert: ' + e.message, 'err')
+    }
   }, 400)
 }
 
@@ -1700,6 +1706,9 @@ async function buildErstellen () {
     status(g ? `Build fertig, aber ${g} Download(s) fehlgeschlagen.` : 'Build fertig.', g ? 'err' : 'ok')
   } catch (e) {
     status('Build fehlgeschlagen: ' + e.message, 'err')
+    // Astra-Fund 32 (16.10.): Fehler weiterreichen, sonst zeigt mitLader
+    // trotzdem «Build fertig» an.
+    throw e
   } finally {
     $('#btnBuildErzeugen').disabled = false
     $('#btnBuildErzeugen').textContent = 'Produktions-Build neu erstellen'
@@ -1716,7 +1725,7 @@ function quelleOderBuild (build) {
   vorschauBauen()
 }
 
-$('#btnBuildErzeugen').onclick = () => mitLader($('#btnBuildErzeugen'), 'Build läuft – bitte warten …', buildErstellen, 'Build fertig. Du kannst weitermachen.')
+$('#btnBuildErzeugen').onclick = () => mitLader($('#btnBuildErzeugen'), 'Build läuft – bitte warten …', buildErstellen, 'Build fertig. Du kannst weitermachen.').catch(() => { /* Banner zeigt den Fehler schon */ })
 $('#btnBuildAnsehen').onclick = () => {
   document.querySelector('.reiter button[data-reiter="vorschau"]').click()
   quelleOderBuild(true)
@@ -1849,12 +1858,19 @@ function seoSpeichern (sofort = false) {
   clearTimeout(seoTimer)
   const tun = async () => {
     if (!aktuell || !seoDaten) return
-    await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/seo`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ seo: seoDaten }),
-    })
-    $('#seoStatus').textContent = 'Gespeichert.'
+    // Astra-Fund 32 (16.10.): «Gespeichert» nur nach geprüfter Antwort.
+    try {
+      const antwort = await fetch(`/api/projekte/${encodeURIComponent(aktuell.id)}/seo`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ seo: seoDaten }),
+      })
+      if (!antwort.ok) throw new Error((await antwort.json().catch(() => ({}))).fehler || 'HTTP ' + antwort.status)
+      $('#seoStatus').textContent = 'Gespeichert.'
+    } catch (e) {
+      $('#seoStatus').textContent = 'NICHT gespeichert: ' + e.message
+      status('SEO-Angaben NICHT gespeichert: ' + e.message, 'err')
+    }
   }
   if (sofort) return tun()
   seoTimer = setTimeout(tun, 500)

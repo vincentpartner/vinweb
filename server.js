@@ -2033,6 +2033,9 @@ vorschau.use(async (req, res, next) => {
     return res.status(400).type('text/plain; charset=utf-8').send('Ungültige Adresse.')
   }
   const teile = pfad.split('/').filter(Boolean)
+  // Astra-Fund 40 (16.10.): Ordner-Adressen («…/en/») behalten ihren
+  // Schlussstrich – sonst findet der Dateiserver das index.html darin nicht.
+  const endetMitSlash = pfad.endsWith('/')
 
   // Review-Fund 2: Sperren arbeiten auf dem NORMALISIERTEN Pfad – ein
   // angehängter Schrägstrich (/config.php/) darf sie nicht umgehen.
@@ -2074,7 +2077,8 @@ vorschau.use(async (req, res, next) => {
   // Quelle. So lässt sich der Produktions-Stand ansehen, ohne die Quelle zu berühren.
   if (teile[1] === '__build__') {
     if (teile.some(t => t === '..' || t.toLowerCase() === '.git')) return res.status(404).end()
-    req.url = '/' + teile.slice(2).map(encodeURIComponent).join('/') + (abfrage ? '?' + abfrage : '')
+    req.url = '/' + teile.slice(2).map(encodeURIComponent).join('/')
+      + (endetMitSlash && teile.length > 2 ? '/' : '') + (abfrage ? '?' + abfrage : '')
     try {
       return buildAusliefererFuer(id)(req, res, next)
     } catch {
@@ -2093,7 +2097,9 @@ vorschau.use(async (req, res, next) => {
 
   // HTML-Seiten der Quelle bekommen die Editor-Brücke eingesetzt – damit
   // funktioniert "Bild anklicken -> hochladen" direkt in der Vorschau.
-  const relPfad = teile.length === 1 ? 'index.html' : teile.slice(1).join('/')
+  let relPfad = teile.length === 1 ? 'index.html' : teile.slice(1).join('/')
+  // Ordner-Adresse («…/en/») heisst: das index.html darin – mit Editor-Brücke.
+  if (endetMitSlash && teile.length > 1) relPfad += '/index.html'
   if (/\.html?$/i.test(relPfad)) {
     try {
       let inhalt = await fs.readFile(path.join(quellPfad(id), relPfad), 'utf8')
@@ -2121,6 +2127,7 @@ vorschau.use(async (req, res, next) => {
   }
 
   const rest = '/' + teile.slice(1).map(encodeURIComponent).join('/')
+    + (endetMitSlash && teile.length > 1 ? '/' : '')
   req.url = rest + (abfrage ? '?' + abfrage : '')
   // Ungültige Kennungen (z. B. der automatische /favicon.ico-Abruf des
   // Browsers) sind hier normal – sie bekommen 404, niemals einen Absturz.
