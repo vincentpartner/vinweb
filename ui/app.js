@@ -1104,6 +1104,14 @@ function blockAnhaengen (art, wer) {
   return { block: b, txt }
 }
 
+// Text vor dem ersten Dateiblock (ganze Datei oder Ersetzung).
+const BLOCK_MARKE = /=== SITEPILOT-(?:DATEI|ERSETZE):/
+function nurErklaerung (t) { return t.split(BLOCK_MARKE)[0] }
+function inArbeit (t) {
+  const dateien = [...t.matchAll(/=== SITEPILOT-(?:DATEI|ERSETZE):\s*([^=\n]+?)\s*===/g)].map(m => m[1])
+  return dateien.length ? '\n\n✎ Änderung an ' + [...new Set(dateien)].join(', ') + ' wird geschrieben …' : ''
+}
+
 async function senden () {
   if (laeuftGerade) return   // doppeltes Cmd+Enter abfangen
   const frage = $('#prompt').value.trim()
@@ -1187,7 +1195,8 @@ async function senden () {
       if (art === 'text') {
         gesammelt += daten.t
         // Dateiblöcke nicht im Chat ausbreiten – die kommen als Karte.
-        antwortBlock.txt.textContent = gesammelt.split('=== SITEPILOT-DATEI:')[0]
+        // Solange die KI daran schreibt, sagt eine Zeile, woran sie arbeitet.
+        antwortBlock.txt.textContent = nurErklaerung(gesammelt) + inArbeit(gesammelt)
         $('#chatVerlauf').scrollTop = $('#chatVerlauf').scrollHeight
       } else if (art === 'kontextErweitert') {
         // Automatisch nachgereichte Dateien auch anhaken – so bleiben sie
@@ -1234,7 +1243,7 @@ async function senden () {
   } catch (e) {
     antwortBlock.txt.classList.remove('tippt')
     if (e.name === 'AbortError') {
-      antwortBlock.txt.textContent = (gesammelt.split('=== SITEPILOT-DATEI:')[0] || '')
+      antwortBlock.txt.textContent = nurErklaerung(gesammelt)
         + '\n\n[Gestoppt – es wurde nichts geschrieben.]'
       status('Gestoppt.', 'ok')
     } else {
